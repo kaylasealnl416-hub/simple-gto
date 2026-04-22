@@ -173,6 +173,7 @@ function createSession() {
     handHistory: [],
     pendingMistake: null,
     lastRake: 0,
+    revealedSeatIds: [],
     timer: {
       secondsLeft: 0,
       expiresAt: 0,
@@ -204,6 +205,9 @@ function restoreSession(existing) {
       seat.totalInvested = STARTING_STACK;
     }
   });
+  if (!Array.isArray(state.session.revealedSeatIds)) {
+    state.session.revealedSeatIds = [];
+  }
   updateSeatResultLabels();
   state.rangeOpen = false;
   state.optionsOpen = false;
@@ -339,6 +343,7 @@ function resetForHand() {
   state.session.raiseCount = 0;
   state.session.preflopAggressorId = null;
   state.session.streetAggressorId = null;
+  state.session.revealedSeatIds = [];
   state.session.handNumber += 1;
   state.session.dealerIndex = (state.session.dealerIndex + 1) % 8;
   assignPositions();
@@ -680,6 +685,7 @@ function resolveActionFlow(seat) {
 }
 
 function awardWithoutShowdown(winner) {
+  state.session.revealedSeatIds = [];
   const total = state.session.seats.reduce((sum, seat) => sum + seat.committed, 0);
   const rake = distributeRake(total);
   winner.stack += total - rake;
@@ -770,6 +776,7 @@ function runBoardToShowdown() {
 
 function showdown() {
   const contenders = activeContenders();
+  state.session.revealedSeatIds = contenders.map((seat) => seat.id);
   const pots = buildSidePots(state.session.seats);
   const evaluations = new Map();
   contenders.forEach((seat) => {
@@ -838,10 +845,11 @@ function finishHand() {
     render();
     return;
   }
+  const revealDelay = state.session.revealedSeatIds.length ? 1800 : 1100;
   state.streetRunoutTimer = setTimeout(() => {
     startNextHand();
     render();
-  }, 1100);
+  }, revealDelay);
 }
 
 function maybePromptTopUp() {
@@ -1070,7 +1078,8 @@ function renderHome() {
 function renderSeat(seat) {
   const style = SEAT_LAYOUT[seat.seatIndex];
   const isHero = seat.seatIndex === HERO_SEAT_INDEX;
-  const showCards = !isHero && !state.reviewOpen;
+  const revealCards = state.session.revealedSeatIds?.includes(seat.id);
+  const faceDown = !isHero && !revealCards;
   const betTag =
     seat.betStreet > 0
       ? `<div class="bet-tag" style="top: calc(${style.top} + 88px); left: calc(${style.left} + 12px);">${formatAmount(seat.betStreet)}</div>`
@@ -1089,7 +1098,7 @@ function renderSeat(seat) {
       <div class="stack">${formatAmount(seat.stack)}</div>
       <div class="status">${seat.status || "等待"}</div>
     </div>
-    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 26px); left: calc(${style.left} + 12px);">${renderPlayingCard(seat.cards[0], showCards)}${renderPlayingCard(seat.cards[1], showCards)}</div>` : ""}
+    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 26px); left: calc(${style.left} + 12px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
   `;
 }
 
