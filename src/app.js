@@ -1036,7 +1036,7 @@ function renderSeat(seat) {
     <div class="seat ${isHero ? "hero" : ""} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
       style="top:${style.top}; left:${style.left};">
       <div class="label">${isHero ? "固定座位" : seat.name}</div>
-      <div class="position">${seat.position}</div>
+      <div class="position">${positionLabel(seat.position)}</div>
       <div class="stack">${formatAmount(seat.stack)}</div>
       <div class="status">${seat.status || "等待"}</div>
     </div>
@@ -1057,7 +1057,7 @@ function renderRangeSheet(hero) {
         <div class="sheet-header">
           <div>
             <h3>翻前范围表</h3>
-            <div class="sheet-meta">${recommendation.position} · ${recommendation.title}</div>
+            <div class="sheet-meta">${positionLabel(recommendation.position)} · ${recommendation.title}</div>
           </div>
           <button class="sheet-close" data-action="close-range">×</button>
         </div>
@@ -1349,6 +1349,19 @@ function streetLabel(street) {
     turn: "转牌",
     river: "河牌"
   }[street] ?? "摊牌";
+}
+
+function positionLabel(position) {
+  return {
+    BTN: "庄位",
+    SB: "小盲",
+    BB: "大盲",
+    UTG: "枪口",
+    "UTG+1": "枪口+1",
+    MP: "中位",
+    HJ: "关煞",
+    CO: "截止位"
+  }[position] ?? position;
 }
 
 function render() {
