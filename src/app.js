@@ -1,0 +1,1481 @@
+import {
+  ACTION_TIMERS,
+  BIG_BLIND,
+  DEVIATED_ARCHETYPES,
+  ELITE_ARCHETYPES,
+  HERO_SEAT_INDEX,
+  INITIAL_TIME_BANK,
+  POSITION_LABELS,
+  SEAT_LAYOUT,
+  SESSION_MS,
+  SMALL_BLIND,
+  STARTING_STACK,
+  TABLE_LABEL
+} from "./config.js";
+import { chooseBotAction, getBotDelayMs } from "./bots.js";
+import { buildRangeMatrix, getRecommendationForHand } from "./ranges.js";
+import {
+  buildSidePots,
+  cardLabel,
+  classifyHoleCards,
+  createDeck,
+  evaluateSeven,
+  formatAmount,
+  handCategory,
+  isRedSuit
+} from "./poker.js";
+
+const STORAGE_KEY = "simple-gto-v1-session";
+const RAKE_PERCENT = 0.05;
+const RAKE_CAP = BIG_BLIND * 3;
+const app = document.getElementById("app");
+const BOT_NAME_POOL = [
+  "NorthRake",
+  "ColdRiver",
+  "StoneReg",
+  "BlueBlind",
+  "TurnPress",
+  "QuietCutoff",
+  "LateRaise",
+  "RiverSense",
+  "TableLine",
+  "EdgeStack",
+  "CalmValue",
+  "PivotPot"
+];
+
+const state = {
+  session: null,
+  rangeOpen: false,
+  optionsOpen: false,
+  reviewOpen: false,
+  pauseNotice: null,
+  topUpPrompt: null,
+  selectedRangeHand: null,
+  timerIntervalId: null,
+  countdownIntervalId: null,
+  botActionTimer: null,
+  streetRunoutTimer: null
+};
+
+function saveSession() {
+  if (!state.session) {
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.session));
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function createSeat(id, seatIndex) {
+  return {
+    id,
+    seatIndex,
+    name: seatIndex === HERO_SEAT_INDEX ? "你" : BOT_NAME_POOL[id % BOT_NAME_POOL.length],
+    stack: STARTING_STACK,
+    betStreet: 0,
+    committed: 0,
+    inHand: true,
+    folded: false,
+    allIn: false,
+    acted: false,
+    cards: [],
+    position: "",
+    archetype: null,
+    status: "",
+    selectedRaiseAmount: null,
+    timeBankSeconds: INITIAL_TIME_BANK,
+    stats: {
+      hands: 0,
+      vpipHands: 0,
+      pfrHands: 0,
+      vpip: 0,
+      pfr: 0
+    },
+    handFlags: {
+      vpipMarked: false,
+      pfrMarked: false
+    },
+    resultLabel: "持平",
+    autoActions: {
+      fold: false,
+      check: false,
+      checkFold: false,
+      callAny: false
+    }
+  };
+}
+
+function clearAutoActions(seat) {
+  seat.autoActions = {
+    fold: false,
+    check: false,
+    checkFold: false,
+    callAny: false
+  };
+}
+
+function pickArchetypes() {
+  const elites = [...ELITE_ARCHETYPES]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3)
+    .map((archetype) => ({ ...archetype }));
+
+  const deviated = [];
+  const counts = new Map();
+  while (deviated.length < 4) {
+    const picked = DEVIATED_ARCHETYPES[Math.floor(Math.random() * DEVIATED_ARCHETYPES.length)];
+    const count = counts.get(picked.key) ?? 0;
+    if (count >= 2) continue;
+    counts.set(picked.key, count + 1);
+    deviated.push({ ...picked });
+  }
+
+  return [...elites, ...deviated].sort(() => Math.random() - 0.5);
+}
+
+function createSession() {
+  const seats = Array.from({ length: 8 }, (_, index) => createSeat(index, index));
+  const archetypes = pickArchetypes();
+  seats.forEach((seat) => {
+    if (seat.seatIndex !== HERO_SEAT_INDEX) {
+      seat.archetype = archetypes.pop();
+    }
+  });
+
+  const now = Date.now();
+  return {
+    startedAt: now,
+    endsAt: now + SESSION_MS,
+    handNumber: 0,
+    dealerIndex: 7,
+    seats,
+    phase: "idle",
+    street: "preflop",
+    board: [],
+    pot: 0,
+    deck: [],
+    currentBet: 0,
+    minRaiseTo: BIG_BLIND * 2,
+    raiseCount: 0,
+    actorIndex: null,
+    handHistory: [],
+    pendingMistake: null,
+    lastRake: 0,
+    timer: {
+      secondsLeft: 0,
+      expiresAt: 0,
+      baseDeadline: 0
+    },
+    sessionSummary: null
+  };
+}
+
+function beginNewSession() {
+  clearTimers();
+  state.session = createSession();
+  state.rangeOpen = false;
+  state.optionsOpen = false;
+  state.reviewOpen = false;
+  state.pauseNotice = null;
+  state.topUpPrompt = null;
+  state.selectedRangeHand = null;
+  startNextHand();
+  startSessionTimer();
+  render();
+}
+
+function restoreSession(existing) {
+  clearTimers();
+  state.session = existing;
+  state.rangeOpen = false;
+  state.optionsOpen = false;
+  state.reviewOpen = Boolean(existing.sessionSummary);
+  state.topUpPrompt = null;
+  startSessionTimer();
+  render();
+  queueBotIfNeeded();
+}
+
+function endSession() {
+  if (!state.session) return;
+  clearTimers();
+  const hero = getHeroSeat();
+  const summary = {
+    durationMs: Date.now() - state.session.startedAt,
+    handCount: state.session.handNumber,
+    heroResult: hero.stack - STARTING_STACK,
+    heroFinalStack: hero.stack,
+    bots: state.session.seats
+      .filter((seat) => seat.seatIndex !== HERO_SEAT_INDEX)
+      .map((seat) => ({
+        id: seat.id,
+        name: seat.name,
+        label: seat.archetype.label,
+        vpip: seat.stats.vpip,
+        pfr: seat.stats.pfr,
+        result: seat.stack - STARTING_STACK
+      }))
+      .sort((left, right) => right.result - left.result),
+    mistake: state.session.pendingMistake,
+    recentHands: [...state.session.handHistory].slice(0, 6)
+  };
+  state.session.sessionSummary = summary;
+  state.reviewOpen = true;
+  saveSession();
+  render();
+}
+
+function clearTimers() {
+  if (state.timerIntervalId) {
+    clearInterval(state.timerIntervalId);
+    state.timerIntervalId = null;
+  }
+  if (state.countdownIntervalId) {
+    clearInterval(state.countdownIntervalId);
+    state.countdownIntervalId = null;
+  }
+  if (state.botActionTimer) {
+    clearTimeout(state.botActionTimer);
+    state.botActionTimer = null;
+  }
+  if (state.streetRunoutTimer) {
+    clearTimeout(state.streetRunoutTimer);
+    state.streetRunoutTimer = null;
+  }
+}
+
+function startSessionTimer() {
+  if (state.timerIntervalId) {
+    clearInterval(state.timerIntervalId);
+  }
+  state.timerIntervalId = setInterval(() => {
+    if (!state.session) return;
+    if (Date.now() >= state.session.endsAt) {
+      endSession();
+      return;
+    }
+    renderTopOnly();
+  }, 1000);
+}
+
+function updateDerivedPot() {
+  state.session.pot = state.session.seats.reduce((sum, seat) => sum + seat.committed, 0);
+}
+
+function assignPositions() {
+  const { seats, dealerIndex } = state.session;
+  seats.forEach((seat) => {
+    const relative = (seat.seatIndex - dealerIndex + seats.length) % seats.length;
+    seat.position = POSITION_LABELS[relative];
+    seat.status = "";
+  });
+}
+
+function getSeatByPosition(position) {
+  return state.session.seats.find((seat) => seat.position === position);
+}
+
+function getHeroSeat() {
+  return state.session.seats[HERO_SEAT_INDEX];
+}
+
+function drawCard() {
+  return state.session.deck.pop();
+}
+
+function resetForHand() {
+  state.session.board = [];
+  state.session.street = "preflop";
+  state.session.currentBet = 0;
+  state.session.minRaiseTo = BIG_BLIND * 2;
+  state.session.raiseCount = 0;
+  state.session.handNumber += 1;
+  state.session.dealerIndex = (state.session.dealerIndex + 1) % 8;
+  assignPositions();
+  state.session.deck = createDeck();
+  state.session.pendingMistake = null;
+  state.pauseNotice = null;
+  state.topUpPrompt = null;
+  state.session.lastRake = 0;
+  state.session.seats.forEach((seat) => {
+    seat.betStreet = 0;
+    seat.committed = 0;
+    seat.folded = false;
+    seat.allIn = false;
+    seat.acted = false;
+    seat.inHand = seat.stack > 0;
+    seat.cards = seat.inHand ? [drawCard(), drawCard()] : [];
+    seat.status = seat.inHand ? "等待行动" : "离桌";
+    seat.selectedRaiseAmount = null;
+    clearAutoActions(seat);
+    if (seat.inHand) {
+      seat.stats.hands += 1;
+    }
+    seat.handFlags.vpipMarked = false;
+    seat.handFlags.pfrMarked = false;
+  });
+
+  postBlind("SB", SMALL_BLIND);
+  postBlind("BB", BIG_BLIND);
+  updateDerivedPot();
+}
+
+function postBlind(position, amount) {
+  const seat = getSeatByPosition(position);
+  if (!seat || !seat.inHand) return;
+  const blind = Math.min(amount, seat.stack);
+  seat.stack -= blind;
+  seat.betStreet += blind;
+  seat.committed += blind;
+  seat.status = position === "SB" ? "小盲" : "大盲";
+  if (seat.stack === 0) {
+    seat.allIn = true;
+  }
+  state.session.currentBet = Math.max(state.session.currentBet, blind);
+  state.session.minRaiseTo = state.session.currentBet + BIG_BLIND;
+}
+
+function firstToActPreflop() {
+  const bbSeat = getSeatByPosition("BB");
+  return nextActiveSeat((bbSeat.seatIndex + 1) % 8);
+}
+
+function streetFirstActor() {
+  const button = getSeatByPosition("BTN");
+  return nextActiveSeat((button.seatIndex + 1) % 8);
+}
+
+function nextActiveSeat(startIndex) {
+  for (let offset = 0; offset < 8; offset += 1) {
+    const seat = state.session.seats[(startIndex + offset) % 8];
+    if (seat.inHand && !seat.folded && !seat.allIn) {
+      return seat;
+    }
+  }
+  return null;
+}
+
+function activeContenders() {
+  return state.session.seats.filter((seat) => seat.inHand && !seat.folded);
+}
+
+function remainingDeciders() {
+  return state.session.seats.filter((seat) => seat.inHand && !seat.folded && !seat.allIn);
+}
+
+function everyoneMatched() {
+  const liveSeats = remainingDeciders();
+  if (liveSeats.length === 0) return true;
+  return liveSeats.every((seat) => seat.acted && seat.betStreet === state.session.currentBet);
+}
+
+function canUseTimeBank(actor) {
+  return actor.timeBankSeconds > 0;
+}
+
+function setActor(seat) {
+  state.session.actorIndex = seat ? seat.seatIndex : null;
+  state.session.seats.forEach((entry) => {
+    if (entry.inHand && !entry.folded && !entry.allIn) {
+      if (entry.seatIndex !== state.session.actorIndex) {
+        entry.status = entry.betStreet === state.session.currentBet ? "等待" : "待跟注";
+      }
+    }
+  });
+  if (!seat) return;
+  seat.status = "待行动";
+  startActionTimer();
+  if (seat.seatIndex === HERO_SEAT_INDEX) {
+    tryHeroAutoAction();
+  }
+}
+
+function startActionTimer() {
+  if (state.countdownIntervalId) {
+    clearInterval(state.countdownIntervalId);
+  }
+  const actor = state.session.seats[state.session.actorIndex];
+  const facingRaise = state.session.currentBet > actor.betStreet;
+  const baseSeconds =
+    state.session.street === "preflop"
+      ? facingRaise
+        ? ACTION_TIMERS.preflopFacingRaise
+        : ACTION_TIMERS.preflopUnopened
+      : ACTION_TIMERS.postflop;
+  state.session.timer.secondsLeft = baseSeconds;
+  state.session.timer.baseDeadline = Date.now() + baseSeconds * 1000;
+  state.session.timer.expiresAt =
+    state.session.timer.baseDeadline + (canUseTimeBank(actor) ? actor.timeBankSeconds * 1000 : 0);
+  state.countdownIntervalId = setInterval(() => {
+    if (!state.session || state.session.actorIndex == null) return;
+    const now = Date.now();
+    const msLeft = state.session.timer.expiresAt - now;
+    if (msLeft <= 0) {
+      clearInterval(state.countdownIntervalId);
+      state.countdownIntervalId = null;
+      handleTimeout();
+      return;
+    }
+    state.session.timer.secondsLeft = Math.ceil(msLeft / 1000);
+    renderTopOnly();
+  }, 250);
+}
+
+function consumeTimeBank(actor) {
+  const overBaseMs = Date.now() - state.session.timer.baseDeadline;
+  if (overBaseMs <= 0) return;
+  const consumedSeconds = Math.min(actor.timeBankSeconds, Math.ceil(overBaseMs / 1000));
+  actor.timeBankSeconds = Math.max(0, actor.timeBankSeconds - consumedSeconds);
+}
+
+function handleTimeout() {
+  const actor = state.session.seats[state.session.actorIndex];
+  if (!actor) return;
+  consumeTimeBank(actor);
+  const toCall = Math.max(0, state.session.currentBet - actor.betStreet);
+  commitAction(actor, toCall > 0 ? "fold" : "check");
+}
+
+function tryHeroAutoAction() {
+  const hero = getHeroSeat();
+  if (state.session.actorIndex !== HERO_SEAT_INDEX || state.pauseNotice || state.reviewOpen) {
+    return;
+  }
+  const toCall = Math.max(0, state.session.currentBet - hero.betStreet);
+  if (hero.autoActions.checkFold) {
+    clearAutoActions(hero);
+    commitAction(hero, toCall > 0 ? "fold" : "check");
+    return;
+  }
+  if (hero.autoActions.check && toCall === 0) {
+    clearAutoActions(hero);
+    commitAction(hero, "check");
+    return;
+  }
+  if (hero.autoActions.callAny) {
+    clearAutoActions(hero);
+    commitAction(hero, toCall > 0 ? "call" : "check");
+    return;
+  }
+  if (hero.autoActions.fold && toCall > 0) {
+    clearAutoActions(hero);
+    commitAction(hero, "fold");
+  }
+}
+
+function updateSeatStats() {
+  state.session.seats.forEach((seat) => {
+    if (!seat.stats.hands) {
+      seat.stats.vpip = 0;
+      seat.stats.pfr = 0;
+      return;
+    }
+    seat.stats.vpip = Math.round((seat.stats.vpipHands / seat.stats.hands) * 100);
+    seat.stats.pfr = Math.round((seat.stats.pfrHands / seat.stats.hands) * 100);
+  });
+}
+
+function captureHeroMistake(seat, actionType) {
+  const recommendation = getRecommendationForHand(state.session, seat);
+  const expected = recommendation.entry;
+  if (!expected) return;
+
+  if (state.session.street === "preflop") {
+    const map = {
+      bet: "raise",
+      raise: "raise",
+      call: "call",
+      check: "fold",
+      fold: "fold"
+    };
+    const actual = map[actionType] ?? "fold";
+    if (expected.action === actual || (expected.action === "mix" && ["raise", "call"].includes(actual))) {
+      return;
+    }
+    state.session.pendingMistake = {
+      street: "翻前",
+      summary:
+        actual === "call"
+          ? "翻前跟注范围过宽"
+          : actual === "fold"
+            ? "翻前放弃了应继续的强牌"
+            : "翻前加注范围偏离当前建议",
+      hand: classifyHoleCards(seat.cards[0], seat.cards[1]),
+      recommendation: expected.label
+    };
+    return;
+  }
+
+  const toCall = Math.max(0, state.session.currentBet - seat.betStreet);
+  const handClass = handCategory([...seat.cards, ...state.session.board]);
+  if (["高牌", "一对"].includes(handClass) && actionType === "call" && toCall > state.session.pot * 0.45) {
+    state.session.pendingMistake = {
+      street: streetLabel(state.session.street),
+      summary: `${streetLabel(state.session.street)}跟注偏松`,
+      hand: classifyHoleCards(seat.cards[0], seat.cards[1]),
+      recommendation: "当前只有翻前范围表可直接回看；翻后先关注本场总结。"
+    };
+  }
+}
+
+function recordHandHistory(entry) {
+  state.session.handHistory.unshift(entry);
+  state.session.handHistory = state.session.handHistory.slice(0, 18);
+}
+
+function distributeRake(totalPot) {
+  const rake = Math.min(Math.round(totalPot * RAKE_PERCENT), RAKE_CAP);
+  state.session.lastRake = rake;
+  return rake;
+}
+
+function commitAction(seat, type, amount = 0) {
+  if (!seat) return;
+  if (state.botActionTimer) {
+    clearTimeout(state.botActionTimer);
+    state.botActionTimer = null;
+  }
+  if (state.countdownIntervalId) {
+    clearInterval(state.countdownIntervalId);
+    state.countdownIntervalId = null;
+  }
+
+  const previousBet = state.session.currentBet;
+  const toCall = Math.max(0, previousBet - seat.betStreet);
+  const isPreflop = state.session.street === "preflop";
+
+  consumeTimeBank(seat);
+
+  if (seat.seatIndex === HERO_SEAT_INDEX) {
+    captureHeroMistake(seat, type);
+    clearAutoActions(seat);
+  }
+
+  if (type === "fold") {
+    seat.folded = true;
+    seat.status = "弃牌";
+  } else if (type === "check") {
+    seat.status = "过牌";
+  } else if (type === "call") {
+    const callAmount = Math.min(toCall, seat.stack);
+    seat.stack -= callAmount;
+    seat.betStreet += callAmount;
+    seat.committed += callAmount;
+    seat.status = callAmount >= toCall ? "跟注" : "全下";
+    if (seat.stack === 0) {
+      seat.allIn = true;
+    }
+  } else if (type === "bet" || type === "raise") {
+    const target = Math.max(amount, state.session.minRaiseTo);
+    const commit = Math.min(target - seat.betStreet, seat.stack);
+    seat.stack -= commit;
+    seat.betStreet += commit;
+    seat.committed += commit;
+    state.session.currentBet = seat.betStreet;
+    state.session.minRaiseTo = state.session.currentBet + Math.max(BIG_BLIND, state.session.currentBet - previousBet);
+    state.session.raiseCount += 1;
+    seat.status = type === "bet" ? "下注" : "加注";
+    if (seat.stack === 0) {
+      seat.allIn = true;
+      seat.status = "全下";
+    }
+    state.session.seats.forEach((entry) => {
+      if (entry.seatIndex !== seat.seatIndex && entry.inHand && !entry.folded && !entry.allIn) {
+        entry.acted = false;
+      }
+    });
+  }
+
+  if (isPreflop && ["call", "raise", "bet"].includes(type) && !seat.handFlags.vpipMarked) {
+    seat.stats.vpipHands += 1;
+    seat.handFlags.vpipMarked = true;
+  }
+  if (isPreflop && ["raise", "bet"].includes(type) && !seat.handFlags.pfrMarked) {
+    seat.stats.pfrHands += 1;
+    seat.handFlags.pfrMarked = true;
+  }
+
+  updateSeatStats();
+  seat.acted = true;
+  updateDerivedPot();
+  resolveActionFlow(seat);
+  saveSession();
+  render();
+}
+
+function resolveActionFlow(seat) {
+  const contenders = activeContenders();
+  if (contenders.length === 1) {
+    awardWithoutShowdown(contenders[0]);
+    return;
+  }
+
+  if (remainingDeciders().length === 0) {
+    runBoardToShowdown();
+    return;
+  }
+
+  if (everyoneMatched()) {
+    advanceStreet();
+    return;
+  }
+
+  const next = nextActiveSeat((seat.seatIndex + 1) % 8);
+  setActor(next);
+  queueBotIfNeeded();
+}
+
+function awardWithoutShowdown(winner) {
+  const total = state.session.seats.reduce((sum, seat) => sum + seat.committed, 0);
+  const rake = distributeRake(total);
+  winner.stack += total - rake;
+  recordHandHistory({
+    handNumber: state.session.handNumber,
+    street: streetLabel(state.session.street),
+    pot: total,
+    rake,
+    result: `${winner.name} 直接赢下 ${formatAmount(total - rake)}`,
+    board: [],
+    heroCards: [...getHeroSeat().cards]
+  });
+  finishHand();
+}
+
+function dealNextStreetCard() {
+  if (state.session.street === "preflop") {
+    state.session.street = "flop";
+    drawCard();
+    state.session.board.push(drawCard(), drawCard(), drawCard());
+    return;
+  }
+  if (state.session.street === "flop") {
+    state.session.street = "turn";
+    drawCard();
+    state.session.board.push(drawCard());
+    return;
+  }
+  if (state.session.street === "turn") {
+    state.session.street = "river";
+    drawCard();
+    state.session.board.push(drawCard());
+    return;
+  }
+  state.session.street = "showdown";
+}
+
+function resetStreetBets() {
+  state.session.seats.forEach((seat) => {
+    seat.betStreet = 0;
+    seat.acted = seat.folded || seat.allIn;
+    if (seat.inHand && !seat.folded && !seat.allIn) {
+      seat.status = "等待";
+    }
+  });
+  state.session.currentBet = 0;
+  state.session.minRaiseTo = BIG_BLIND;
+  state.session.raiseCount = 0;
+}
+
+function advanceStreet() {
+  resetStreetBets();
+  dealNextStreetCard();
+  if (state.session.street === "showdown") {
+    showdown();
+    return;
+  }
+  if (remainingDeciders().length === 0) {
+    runBoardToShowdown();
+    render();
+    return;
+  }
+  const next = streetFirstActor();
+  setActor(next);
+  render();
+  queueBotIfNeeded();
+}
+
+function runBoardToShowdown() {
+  if (state.streetRunoutTimer) {
+    clearTimeout(state.streetRunoutTimer);
+  }
+  const continueRunout = () => {
+    if (!state.session) return;
+    if (state.session.street === "river") {
+      state.session.street = "showdown";
+      showdown();
+      return;
+    }
+    resetStreetBets();
+    dealNextStreetCard();
+    render();
+    state.streetRunoutTimer = setTimeout(continueRunout, 380);
+  };
+  state.streetRunoutTimer = setTimeout(continueRunout, 320);
+}
+
+function showdown() {
+  const contenders = activeContenders();
+  const pots = buildSidePots(state.session.seats);
+  const evaluations = new Map();
+  contenders.forEach((seat) => {
+    evaluations.set(seat.id, evaluateSeven([...seat.cards, ...state.session.board]).score);
+  });
+
+  const totalPot = state.session.seats.reduce((sum, seat) => sum + seat.committed, 0);
+  let remainingRake = distributeRake(totalPot);
+  const winnersSummary = new Map();
+
+  for (const pot of pots) {
+    const eligible = contenders.filter((seat) => pot.eligible.includes(seat.id));
+    eligible.sort((a, b) => {
+      const scoreA = evaluations.get(a.id);
+      const scoreB = evaluations.get(b.id);
+      for (let i = 0; i < Math.max(scoreA.length, scoreB.length); i += 1) {
+        const diff = (scoreB[i] ?? 0) - (scoreA[i] ?? 0);
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
+    const bestScore = evaluations.get(eligible[0].id);
+    const winners = eligible.filter(
+      (seat) => JSON.stringify(evaluations.get(seat.id)) === JSON.stringify(bestScore)
+    );
+    const potRake = Math.min(remainingRake, pot.amount);
+    const distributable = pot.amount - potRake;
+    remainingRake -= potRake;
+    const share = distributable / winners.length;
+    winners.forEach((seat) => {
+      seat.stack += share;
+      winnersSummary.set(seat.id, seat);
+    });
+  }
+
+  const rake = state.session.lastRake;
+  const winnerNames = [...winnersSummary.values()]
+    .map((seat) => `${seat.name} ${handCategory([...seat.cards, ...state.session.board])}`)
+    .join("，");
+
+  recordHandHistory({
+    handNumber: state.session.handNumber,
+    street: "摊牌",
+    pot: totalPot,
+    rake,
+    result: `摊牌结算 · ${winnerNames}`,
+    board: [...state.session.board],
+    heroCards: [...getHeroSeat().cards]
+  });
+  finishHand();
+}
+
+function finishHand() {
+  state.session.seats.forEach((seat) => {
+    const delta = seat.stack - STARTING_STACK;
+    seat.resultLabel = `${delta >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(delta))}`;
+  });
+  if (Date.now() >= state.session.endsAt) {
+    endSession();
+    return;
+  }
+  if (state.session.pendingMistake) {
+    state.pauseNotice = state.session.pendingMistake;
+    render();
+    return;
+  }
+  if (maybePromptTopUp()) {
+    render();
+    return;
+  }
+  state.streetRunoutTimer = setTimeout(() => {
+    startNextHand();
+    render();
+  }, 1100);
+}
+
+function maybePromptTopUp() {
+  const hero = getHeroSeat();
+  if (hero.stack >= STARTING_STACK) {
+    state.topUpPrompt = null;
+    return false;
+  }
+  const topUpAmount = STARTING_STACK - hero.stack;
+  state.topUpPrompt = {
+    amount: topUpAmount
+  };
+  return true;
+}
+
+function applyTopUp() {
+  const hero = getHeroSeat();
+  if (!state.topUpPrompt) return;
+  hero.stack += state.topUpPrompt.amount;
+  state.topUpPrompt = null;
+  saveSession();
+  startNextHand();
+}
+
+function skipTopUp() {
+  state.topUpPrompt = null;
+  saveSession();
+  startNextHand();
+}
+
+function startNextHand() {
+  resetForHand();
+  const first = firstToActPreflop();
+  setActor(first);
+  state.session.phase = "playing";
+  saveSession();
+  render();
+  queueBotIfNeeded();
+}
+
+function queueBotIfNeeded() {
+  if (!state.session || state.session.actorIndex == null) return;
+  const actor = state.session.seats[state.session.actorIndex];
+  if (!actor || actor.seatIndex === HERO_SEAT_INDEX || state.reviewOpen || state.pauseNotice) {
+    return;
+  }
+  if (state.botActionTimer) {
+    clearTimeout(state.botActionTimer);
+  }
+  state.botActionTimer = setTimeout(() => {
+    const action = chooseBotAction(state.session, actor);
+    if (action.type === "fold" || action.type === "check") {
+      commitAction(actor, action.type);
+      return;
+    }
+    if (action.type === "call") {
+      commitAction(actor, "call", action.amount);
+      return;
+    }
+    commitAction(actor, action.type === "bet" ? "bet" : "raise", action.amount);
+  }, getBotDelayMs(actor));
+}
+
+function getQuickSizes(hero) {
+  const toCall = Math.max(0, state.session.currentBet - hero.betStreet);
+  const unopened = state.session.currentBet === 0;
+
+  if (state.session.street === "preflop") {
+    if (unopened) {
+      return [2.5, 3, 4, 6].map((bb) => ({
+        label: `${Math.round(bb * BIG_BLIND)} / ${bb}BB`,
+        amount: bb * BIG_BLIND
+      }));
+    }
+    const base = Math.max(state.session.currentBet, toCall + BIG_BLIND);
+    return [2.6, 3, 3.6, 4.5].map((multiplier) => {
+      const target = Math.round(base * multiplier);
+      return {
+        label: `${target} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
+        amount: target
+      };
+    });
+  }
+
+  const betBase = unopened ? state.session.pot : state.session.currentBet + state.session.pot * 0.5;
+  return [0.33, 0.5, 0.75, 1].map((pct) => {
+    const target = Math.max(
+      state.session.currentBet + BIG_BLIND,
+      Math.round((unopened ? state.session.pot : betBase) * pct + (unopened ? 0 : state.session.currentBet))
+    );
+    return {
+      label: `${target} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
+      amount: target
+    };
+  });
+}
+
+function heroAvailableActions() {
+  const hero = getHeroSeat();
+  const toCall = Math.max(0, state.session.currentBet - hero.betStreet);
+  const unopened = state.session.currentBet === 0;
+
+  if (!hero || state.session.actorIndex !== HERO_SEAT_INDEX || state.reviewOpen || state.pauseNotice) {
+    return {
+      available: false,
+      quickSizes: [],
+      buttons: []
+    };
+  }
+
+  const quickSizes = getQuickSizes(hero);
+  const selected = hero.selectedRaiseAmount ?? quickSizes[1]?.amount ?? BIG_BLIND * 3;
+
+  return {
+    available: true,
+    quickSizes,
+    buttons: [
+      {
+        type: "fold",
+        label: toCall > 0 ? "弃牌" : "过牌/弃牌",
+        detail: ""
+      },
+      {
+        type: toCall > 0 ? "call" : "check",
+        label: toCall > 0 ? "跟注" : "过牌",
+        detail: toCall > 0 ? formatAmount(toCall) : "0 / 0BB"
+      },
+      {
+        type: unopened ? "bet" : "raise",
+        label: unopened ? "下注" : "加注",
+        detail: formatAmount(selected)
+      }
+    ]
+  };
+}
+
+function getSelectedRaiseAmount() {
+  const hero = getHeroSeat();
+  const quickSizes = getQuickSizes(hero);
+  return hero.selectedRaiseAmount ?? quickSizes[1]?.amount ?? BIG_BLIND * 3;
+}
+
+function setAutoAction(actionKey) {
+  const hero = getHeroSeat();
+  const enabled = !hero.autoActions[actionKey];
+  clearAutoActions(hero);
+  hero.autoActions[actionKey] = enabled;
+  saveSession();
+  render();
+}
+
+function toggleRange(open) {
+  state.rangeOpen = typeof open === "boolean" ? open : !state.rangeOpen;
+  render();
+}
+
+function toggleOptions(open) {
+  state.optionsOpen = typeof open === "boolean" ? open : !state.optionsOpen;
+  render();
+}
+
+function continueAfterPause() {
+  state.pauseNotice = null;
+  if (maybePromptTopUp()) {
+    saveSession();
+    render();
+    return;
+  }
+  startNextHand();
+  render();
+}
+
+function renderTopOnly() {
+  const topTimer = document.querySelector("[data-role='session-clock']");
+  const actionTimer = document.querySelector("[data-role='action-clock']");
+  const timeBank = document.querySelector("[data-role='time-bank']");
+  if (!topTimer || !actionTimer || !timeBank || !state.session || state.session.actorIndex == null) return;
+  const sessionLeft = Math.max(0, state.session.endsAt - Date.now());
+  topTimer.textContent = formatSessionTime(sessionLeft);
+  actionTimer.textContent = `${state.session.timer.secondsLeft}s`;
+  timeBank.textContent = `${state.session.seats[state.session.actorIndex].timeBankSeconds}s`;
+}
+
+function formatSessionTime(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const minutes = String(Math.floor(total / 60)).padStart(2, "0");
+  const seconds = String(total % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function renderPlayingCard(card, faceDown = false) {
+  if (!card || faceDown) {
+    return `<div class="playing-card back"></div>`;
+  }
+  const red = isRedSuit(card) ? "red" : "";
+  return `
+    <div class="playing-card ${red}">
+      <span class="rank">${card.rank}</span>
+      <span class="suit">${cardLabel(card).slice(1)}</span>
+    </div>
+  `;
+}
+
+function renderHome() {
+  const hasSaved = Boolean(loadSession());
+  return `
+    <div class="app-shell">
+      <div class="home-screen">
+        <section class="hero-card">
+          <h1>简单GTO</h1>
+          <p>只做一件事：让你在手机上打开就能进入 8 人现金局，对着更像真人强手的桌风持续实战。</p>
+        </section>
+        <button class="home-cta" data-action="start-session">开始实战</button>
+        <button class="secondary-action ${hasSaved ? "" : "hidden"}" data-action="continue-session">继续上次牌桌</button>
+        <div class="home-note">V1 固定 8-max / 10-20 / 200BB，金额与 BB 双显示。</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSeat(seat) {
+  const style = SEAT_LAYOUT[seat.seatIndex];
+  const isHero = seat.seatIndex === HERO_SEAT_INDEX;
+  const showCards = !isHero && !state.reviewOpen;
+  const betTag =
+    seat.betStreet > 0
+      ? `<div class="bet-tag" style="top: calc(${style.top} + 88px); left: calc(${style.left} + 12px);">${formatAmount(seat.betStreet)}</div>`
+      : "";
+  const dealer =
+    seat.position === "BTN"
+      ? `<div class="dealer-button" style="top: calc(${style.top} + 10px); left: calc(${style.left} - 16px);">D</div>`
+      : "";
+  return `
+    ${dealer}
+    ${betTag}
+    <div class="seat ${isHero ? "hero" : ""} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
+      style="top:${style.top}; left:${style.left};">
+      <div class="label">${isHero ? "固定座位" : seat.name}</div>
+      <div class="position">${seat.position}</div>
+      <div class="stack">${formatAmount(seat.stack)}</div>
+      <div class="status">${seat.status || "等待"}</div>
+    </div>
+    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 26px); left: calc(${style.left} + 12px);">${renderPlayingCard(seat.cards[0], showCards)}${renderPlayingCard(seat.cards[1], showCards)}</div>` : ""}
+  `;
+}
+
+function renderRangeSheet(hero) {
+  const recommendation = getRecommendationForHand(state.session, hero);
+  const matrix = buildRangeMatrix(recommendation.position, recommendation.spot);
+  const selected = state.selectedRangeHand ?? classifyHoleCards(hero.cards[0], hero.cards[1]) ?? matrix[0][0].hand;
+  const detail = matrix.flat().find((cell) => cell.hand === selected) ?? matrix[0][0];
+  return `
+    <div class="overlay ${state.rangeOpen ? "open" : ""}" data-action="close-range"></div>
+    <section class="sheet ${state.rangeOpen ? "open" : ""}">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-header">
+          <div>
+            <h3>翻前范围表</h3>
+            <div class="sheet-meta">${recommendation.position} · ${recommendation.title}</div>
+          </div>
+          <button class="sheet-close" data-action="close-range">×</button>
+        </div>
+        <div class="range-grid">
+          ${matrix
+            .flat()
+            .map(
+              (cell) => `
+                <button class="range-cell ${cell.colorClass} ${cell.hand === selected ? "active" : ""}" data-hand="${cell.hand}">
+                  ${cell.hand}
+                  <span class="pct">${cell.pct}%</span>
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+        <div class="range-detail">
+          <strong>${detail.hand} · ${detail.pct}%</strong>
+          <p>${detail.label}。当前面板只服务翻前实战，颜色规则固定：红=加注，蓝=跟注，灰=弃牌。</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderOptionsSheet() {
+  const hero = getHeroSeat();
+  return `
+    <div class="overlay ${state.optionsOpen ? "open" : ""}" data-action="close-options"></div>
+    <section class="sheet ${state.optionsOpen ? "open" : ""}">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-header">
+          <div>
+            <h3>选项</h3>
+            <div class="sheet-meta">只保留最少工具，同时提供本场状态和手牌历史。</div>
+          </div>
+          <button class="sheet-close" data-action="close-options">×</button>
+        </div>
+        <div class="options-stack">
+          <div class="mini-panel">
+            <strong>本场状态</strong>
+            <p>当前筹码：${formatAmount(hero.stack)} · 本场 ${hero.stack >= STARTING_STACK ? "赢" : "输"} ${formatAmount(Math.abs(hero.stack - STARTING_STACK))}</p>
+            <p>已打手数：${state.session.handNumber} · 最近抽水：${formatAmount(state.session.lastRake)}</p>
+          </div>
+          <div class="history-panel">
+            <strong>手牌历史</strong>
+            <ul class="history-list">
+              ${state.session.handHistory
+                .slice(0, 6)
+                .map(
+                  (hand) => `
+                    <li class="history-item">
+                      <span>#${hand.handNumber} · ${hand.street}</span>
+                      <span>${hand.result}</span>
+                    </li>
+                  `
+                )
+                .join("") || "<li class='history-item muted'>本场还没有完成的手牌。</li>"}
+            </ul>
+          </div>
+          <button class="modal-action" data-action="restart-session">重新开始</button>
+          <button class="modal-action" data-action="show-help">规则说明</button>
+          <button class="modal-action danger" data-action="end-session">结束本场</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPauseBanner() {
+  if (!state.pauseNotice) return "";
+  return `
+    <section class="pause-banner">
+      <div class="pause-stack">
+        <div>
+          <h4>${state.pauseNotice.street}</h4>
+          <p>${state.pauseNotice.summary}</p>
+          <p class="muted">当前记录：${state.pauseNotice.hand} · 建议：${state.pauseNotice.recommendation}</p>
+        </div>
+        <button class="home-cta" data-action="continue-after-pause">继续下一手</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderTopUpPrompt() {
+  if (!state.topUpPrompt) return "";
+  return `
+    <section class="pause-banner">
+      <div class="pause-stack">
+        <div>
+          <h4>补满筹码</h4>
+          <p>当前筹码低于 200BB。按现金局通行规则，你可以在下一手开始前补满。</p>
+          <p class="muted">补码金额：${formatAmount(state.topUpPrompt.amount)}</p>
+        </div>
+        <div class="prompt-actions">
+          <button class="secondary-action" data-action="skip-top-up">继续不补</button>
+          <button class="home-cta" data-action="apply-top-up">补满到 200BB</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderReviewCard() {
+  if (!state.reviewOpen || !state.session?.sessionSummary) return "";
+  const summary = state.session.sessionSummary;
+  return `
+    <div class="overlay open"></div>
+    <section class="pause-banner" style="inset: 20px 18px auto;">
+      <div class="review-card">
+        <h3>本场总结</h3>
+        <div class="review-section">
+          <p class="muted">先看这桌都是什么人。</p>
+          <ul class="review-list">
+            ${summary.bots
+              .map(
+                (bot) => `
+                  <li class="review-item">
+                    <strong>${bot.name}<span class="review-tag">${bot.label}</span></strong>
+                    <p>VPIP ${bot.vpip}% · PFR ${bot.pfr}% · 本场 ${bot.result >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(bot.result))}</p>
+                  </li>
+                `
+              )
+              .join("")}
+          </ul>
+        </div>
+        <div class="review-section">
+          <p>你的本场结果：${summary.heroResult >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(summary.heroResult))}</p>
+          <p>最终筹码：${formatAmount(summary.heroFinalStack)} · 用时 ${formatSessionTime(summary.durationMs)} · 共 ${summary.handCount} 手</p>
+          <p>${summary.mistake ? `最大问题：${summary.mistake.street} · ${summary.mistake.summary}` : "本场没有记录到明显偏离。"} </p>
+        </div>
+        <div class="review-section">
+          <strong class="review-subtitle">最近完成的手牌</strong>
+          <ul class="history-list">
+            ${summary.recentHands
+              .map(
+                (hand) => `
+                  <li class="history-item">
+                    <span>#${hand.handNumber} · ${hand.street}</span>
+                    <span>${hand.result}</span>
+                  </li>
+                `
+              )
+              .join("")}
+          </ul>
+        </div>
+        <div class="review-section">
+          <button class="home-cta" data-action="back-home">返回首页</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPreActionRow(hero) {
+  const items = [
+    { key: "fold", label: "弃牌" },
+    { key: "check", label: "看牌" },
+    { key: "checkFold", label: "看牌/弃牌" },
+    { key: "callAny", label: "跟注任意" }
+  ];
+  return `
+    <div class="preaction-row">
+      ${items
+        .map(
+          (item) => `
+            <button class="preaction-chip ${hero.autoActions[item.key] ? "active" : ""}" data-auto-action="${item.key}">
+              ${item.label}
+            </button>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderActionPanel(hero) {
+  const actionConfig = heroAvailableActions();
+  const actor = state.session.seats[state.session.actorIndex];
+
+  if (!actionConfig.available) {
+    return `
+      <section class="action-panel">
+        <div class="wait-panel">
+          <div>
+            <strong>${actor?.seatIndex === HERO_SEAT_INDEX ? "等待系统处理" : `${actor?.name ?? "对手"}正在行动`}</strong>
+            <p>${actor?.seatIndex === HERO_SEAT_INDEX ? "当前动作已锁定，系统正在推进。" : "可以提前设置常用预选动作。"} </p>
+          </div>
+          ${renderPreActionRow(hero)}
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="action-panel">
+      <div class="quick-sizes">
+        ${actionConfig.quickSizes
+          .map(
+            (size) => `
+              <button class="quick-size ${Math.round(getSelectedRaiseAmount()) === Math.round(size.amount) ? "active" : ""}" data-raise-amount="${size.amount}">
+                ${size.label}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="action-row">
+        ${actionConfig.buttons
+          .map(
+            (button, index) => `
+              <button class="action-chip ${index === 1 ? "primary" : ""} ${button.type === "raise" || button.type === "bet" ? "raise" : ""}" data-play-action="${button.type}">
+                ${button.label}
+                <small>${button.detail || "&nbsp;"}</small>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      ${renderPreActionRow(hero)}
+    </section>
+  `;
+}
+
+function renderTable() {
+  const hero = getHeroSeat();
+  const actor = state.session.actorIndex != null ? state.session.seats[state.session.actorIndex] : null;
+  const sessionLeft = formatSessionTime(state.session.endsAt - Date.now());
+  return `
+    <div class="app-shell">
+      <div class="table-screen">
+        <section class="topbar">
+          <div class="topbar-row">
+            <div>
+              <div class="topbar-title">简单GTO</div>
+              <div class="topbar-meta">${TABLE_LABEL}</div>
+            </div>
+            <div class="topbar-meta">
+              <span>本场 <strong data-role="session-clock">${sessionLeft}</strong></span>
+              <span>行动 <strong data-role="action-clock">${state.session.timer.secondsLeft}s</strong></span>
+              <span>TB <strong data-role="time-bank">${actor?.timeBankSeconds ?? INITIAL_TIME_BANK}s</strong></span>
+            </div>
+          </div>
+        </section>
+        <section class="subbar">
+          <div class="subbar-row">
+            <span class="subbar-chip">手数 <strong>#${state.session.handNumber}</strong></span>
+            <span class="subbar-chip">底池 <strong>${formatAmount(state.session.pot)}</strong></span>
+            <span class="subbar-chip">当前街 <strong>${streetLabel(state.session.street)}</strong></span>
+          </div>
+        </section>
+        <section class="table-stage">
+          <div class="pot-box"><strong>底池 ${formatAmount(state.session.pot)}</strong></div>
+          <div class="board">${state.session.board.map((card) => renderPlayingCard(card)).join("")}</div>
+          <div class="seat-grid">
+            ${state.session.seats.map((seat) => renderSeat(seat)).join("")}
+          </div>
+          <button
+            type="button"
+            class="dealer-button strategy-trigger"
+            data-action="open-range">
+            🂠
+          </button>
+          <div class="hero-cards">
+            ${hero.cards.map((card) => renderPlayingCard(card)).join("")}
+          </div>
+        </section>
+        ${renderActionPanel(hero)}
+        <section class="bottom-nav">
+          <button class="pill-button ${state.rangeOpen ? "active" : ""}" data-action="open-range">策略</button>
+          <button class="pill-button ${state.optionsOpen ? "active" : ""}" data-action="open-options">选项</button>
+        </section>
+      </div>
+      ${renderRangeSheet(hero)}
+      ${renderOptionsSheet()}
+      ${renderPauseBanner()}
+      ${renderTopUpPrompt()}
+      ${renderReviewCard()}
+    </div>
+  `;
+}
+
+function streetLabel(street) {
+  return {
+    preflop: "翻前",
+    flop: "翻牌",
+    turn: "转牌",
+    river: "河牌"
+  }[street] ?? "摊牌";
+}
+
+function render() {
+  app.innerHTML = state.session ? renderTable() : renderHome();
+  bindEvents();
+}
+
+function bindEvents() {
+  app.querySelectorAll("[data-action='start-session']").forEach((button) => {
+    button.addEventListener("click", beginNewSession);
+  });
+
+  app.querySelectorAll("[data-action='continue-session']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const existing = loadSession();
+      if (existing) {
+        restoreSession(existing);
+      }
+    });
+  });
+
+  app.querySelectorAll("[data-action='open-range']").forEach((button) => {
+    button.addEventListener("click", () => toggleRange(true));
+  });
+
+  app.querySelectorAll("[data-action='close-range']").forEach((button) => {
+    button.addEventListener("click", () => toggleRange(false));
+  });
+
+  app.querySelectorAll("[data-action='open-options']").forEach((button) => {
+    button.addEventListener("click", () => toggleOptions(true));
+  });
+
+  app.querySelectorAll("[data-action='close-options']").forEach((button) => {
+    button.addEventListener("click", () => toggleOptions(false));
+  });
+
+  app.querySelectorAll("[data-action='continue-after-pause']").forEach((button) => {
+    button.addEventListener("click", continueAfterPause);
+  });
+
+  app.querySelectorAll("[data-action='apply-top-up']").forEach((button) => {
+    button.addEventListener("click", applyTopUp);
+  });
+
+  app.querySelectorAll("[data-action='skip-top-up']").forEach((button) => {
+    button.addEventListener("click", skipTopUp);
+  });
+
+  app.querySelectorAll("[data-action='end-session']").forEach((button) => {
+    button.addEventListener("click", endSession);
+  });
+
+  app.querySelectorAll("[data-action='restart-session']").forEach((button) => {
+    button.addEventListener("click", beginNewSession);
+  });
+
+  app.querySelectorAll("[data-action='show-help']").forEach((button) => {
+    button.addEventListener("click", () => {
+      window.alert("固定规则：8-max / 10-20 / 200BB。抽水 5% 封顶 3BB。补码参照现金局通用规则，只允许在手与手之间发生。范围表只提供翻前辅助。");
+    });
+  });
+
+  app.querySelectorAll("[data-action='back-home']").forEach((button) => {
+    button.addEventListener("click", () => {
+      clearTimers();
+      localStorage.removeItem(STORAGE_KEY);
+      state.session = null;
+      state.reviewOpen = false;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-play-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const hero = getHeroSeat();
+      if (state.session.actorIndex !== HERO_SEAT_INDEX) return;
+      const action = button.dataset.playAction;
+      if (action === "raise" || action === "bet") {
+        commitAction(hero, action, getSelectedRaiseAmount());
+      } else {
+        commitAction(hero, action);
+      }
+    });
+  });
+
+  app.querySelectorAll("[data-raise-amount]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const hero = getHeroSeat();
+      hero.selectedRaiseAmount = Number(button.dataset.raiseAmount);
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-hand]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedRangeHand = button.dataset.hand;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-auto-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setAutoAction(button.dataset.autoAction);
+    });
+  });
+}
+
+function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+      // V1 stays usable even when registration fails.
+    });
+  }
+}
+
+function boot() {
+  const existing = loadSession();
+  registerServiceWorker();
+  render();
+  if (window.location.hash.includes("autostart")) {
+    beginNewSession();
+    return;
+  }
+  if (existing) {
+    app.querySelector("[data-action='continue-session']")?.classList.remove("hidden");
+  }
+}
+
+boot();
