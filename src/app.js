@@ -93,6 +93,7 @@ function createSeat(id, seatIndex) {
     status: "",
     selectedRaiseAmount: null,
     timeBankSeconds: INITIAL_TIME_BANK,
+    totalInvested: STARTING_STACK,
     stats: {
       hands: 0,
       vpipHands: 0,
@@ -166,6 +167,8 @@ function createSession() {
     currentBet: 0,
     minRaiseTo: BIG_BLIND * 2,
     raiseCount: 0,
+    preflopAggressorId: null,
+    streetAggressorId: null,
     actorIndex: null,
     handHistory: [],
     pendingMistake: null,
@@ -196,6 +199,12 @@ function beginNewSession() {
 function restoreSession(existing) {
   clearTimers();
   state.session = existing;
+  state.session.seats.forEach((seat) => {
+    if (!Number.isFinite(seat.totalInvested)) {
+      seat.totalInvested = STARTING_STACK;
+    }
+  });
+  updateSeatResultLabels();
   state.rangeOpen = false;
   state.optionsOpen = false;
   state.reviewOpen = Boolean(existing.sessionSummary);
@@ -212,7 +221,7 @@ function endSession() {
   const summary = {
     durationMs: Date.now() - state.session.startedAt,
     handCount: state.session.handNumber,
-    heroResult: hero.stack - STARTING_STACK,
+    heroResult: seatNetResult(hero),
     heroFinalStack: hero.stack,
     bots: state.session.seats
       .filter((seat) => seat.seatIndex !== HERO_SEAT_INDEX)
@@ -222,7 +231,7 @@ function endSession() {
         label: seat.archetype.label,
         vpip: seat.stats.vpip,
         pfr: seat.stats.pfr,
-        result: seat.stack - STARTING_STACK
+        result: seatNetResult(seat)
       }))
       .sort((left, right) => right.result - left.result),
     mistake: state.session.pendingMistake,
@@ -288,6 +297,36 @@ function getHeroSeat() {
   return state.session.seats[HERO_SEAT_INDEX];
 }
 
+function seatNetResult(seat) {
+  return seat.stack - seat.totalInvested;
+}
+
+function updateSeatResultLabels() {
+  state.session.seats.forEach((seat) => {
+    const delta = seatNetResult(seat);
+    seat.resultLabel = `${delta >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(delta))}`;
+  });
+}
+
+function topUpSeatToMax(seat) {
+  const amount = Math.max(0, STARTING_STACK - seat.stack);
+  if (!amount) return 0;
+  seat.stack += amount;
+  seat.totalInvested += amount;
+  return amount;
+}
+
+function autoTopUpBots() {
+  state.session.seats.forEach((seat) => {
+    if (seat.seatIndex === HERO_SEAT_INDEX) return;
+    const topped = topUpSeatToMax(seat);
+    if (topped > 0) {
+      seat.status = "已补满";
+    }
+  });
+  updateSeatResultLabels();
+}
+
 function drawCard() {
   return state.session.deck.pop();
 }
@@ -298,6 +337,8 @@ function resetForHand() {
   state.session.currentBet = 0;
   state.session.minRaiseTo = BIG_BLIND * 2;
   state.session.raiseCount = 0;
+  state.session.preflopAggressorId = null;
+  state.session.streetAggressorId = null;
   state.session.handNumber += 1;
   state.session.dealerIndex = (state.session.dealerIndex + 1) % 8;
   assignPositions();
@@ -583,6 +624,10 @@ function commitAction(seat, type, amount = 0) {
     state.session.currentBet = seat.betStreet;
     state.session.minRaiseTo = state.session.currentBet + Math.max(BIG_BLIND, state.session.currentBet - previousBet);
     state.session.raiseCount += 1;
+    state.session.streetAggressorId = seat.id;
+    if (isPreflop) {
+      state.session.preflopAggressorId = seat.id;
+    }
     seat.status = type === "bet" ? "下注" : "加注";
     if (seat.stack === 0) {
       seat.allIn = true;
@@ -683,6 +728,7 @@ function resetStreetBets() {
   state.session.currentBet = 0;
   state.session.minRaiseTo = BIG_BLIND;
   state.session.raiseCount = 0;
+  state.session.streetAggressorId = null;
 }
 
 function advanceStreet() {
@@ -777,10 +823,8 @@ function showdown() {
 }
 
 function finishHand() {
-  state.session.seats.forEach((seat) => {
-    const delta = seat.stack - STARTING_STACK;
-    seat.resultLabel = `${delta >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(delta))}`;
-  });
+  autoTopUpBots();
+  updateSeatResultLabels();
   if (Date.now() >= state.session.endsAt) {
     endSession();
     return;
@@ -816,14 +860,19 @@ function maybePromptTopUp() {
 function applyTopUp() {
   const hero = getHeroSeat();
   if (!state.topUpPrompt) return;
-  hero.stack += state.topUpPrompt.amount;
+  topUpSeatToMax(hero);
   state.topUpPrompt = null;
+  updateSeatResultLabels();
   saveSession();
   startNextHand();
 }
 
 function skipTopUp() {
   state.topUpPrompt = null;
+  if (getHeroSeat().stack === 0) {
+    endSession();
+    return;
+  }
   saveSession();
   startNextHand();
 }
@@ -1085,6 +1134,7 @@ function renderRangeSheet(hero) {
 
 function renderOptionsSheet() {
   const hero = getHeroSeat();
+  const heroNet = seatNetResult(hero);
   return `
     <div class="overlay ${state.optionsOpen ? "open" : ""}" data-action="close-options"></div>
     <section class="sheet ${state.optionsOpen ? "open" : ""}">
@@ -1100,7 +1150,7 @@ function renderOptionsSheet() {
         <div class="options-stack">
           <div class="mini-panel">
             <strong>本场状态</strong>
-            <p>当前筹码：${formatAmount(hero.stack)} · 本场 ${hero.stack >= STARTING_STACK ? "赢" : "输"} ${formatAmount(Math.abs(hero.stack - STARTING_STACK))}</p>
+            <p>当前筹码：${formatAmount(hero.stack)} · 本场 ${heroNet >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(heroNet))}</p>
             <p>已打手数：${state.session.handNumber} · 最近抽水：${formatAmount(state.session.lastRake)}</p>
           </div>
           <div class="history-panel">
@@ -1146,16 +1196,17 @@ function renderPauseBanner() {
 
 function renderTopUpPrompt() {
   if (!state.topUpPrompt) return "";
+  const busted = getHeroSeat().stack === 0;
   return `
     <section class="pause-banner">
       <div class="pause-stack">
         <div>
           <h4>补满筹码</h4>
-          <p>当前筹码低于 200BB。按现金局通行规则，你可以在下一手开始前补满。</p>
+          <p>${busted ? "你已经出局。按现金局通行规则，需要在下一手前补码后才能继续。" : "当前筹码低于 200BB。按现金局通行规则，你可以在下一手开始前补满。"}</p>
           <p class="muted">补码金额：${formatAmount(state.topUpPrompt.amount)}</p>
         </div>
         <div class="prompt-actions">
-          <button class="secondary-action" data-action="skip-top-up">继续不补</button>
+          <button class="secondary-action" data-action="skip-top-up">${busted ? "结束本场" : "继续不补"}</button>
           <button class="home-cta" data-action="apply-top-up">补满到 200BB</button>
         </div>
       </div>

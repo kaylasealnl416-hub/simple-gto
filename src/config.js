@@ -45,13 +45,111 @@ export const DEVIATED_ARCHETYPES = [
 ];
 
 export const ARCHETYPE_BEHAVIOR = {
-  "elite-tag": { openShift: 2, callShift: -4, aggression: 0.58, bluff: 0.18, delay: [900, 1800] },
-  "elite-balanced": { openShift: 0, callShift: 0, aggression: 0.52, bluff: 0.16, delay: [1000, 1900] },
-  "elite-pressure": { openShift: -2, callShift: -2, aggression: 0.66, bluff: 0.22, delay: [850, 1700] },
-  "weak-tight": { openShift: 8, callShift: 8, aggression: 0.24, bluff: 0.05, delay: [1100, 2100] },
-  lag: { openShift: -8, callShift: -6, aggression: 0.72, bluff: 0.28, delay: [800, 1600] },
-  "calling-station": { openShift: 6, callShift: -10, aggression: 0.2, bluff: 0.04, delay: [1000, 2000] },
-  maniac: { openShift: -14, callShift: -12, aggression: 0.84, bluff: 0.36, delay: [650, 1500] }
+  "elite-tag": {
+    openShift: 2,
+    callShift: -4,
+    aggression: 0.58,
+    bluff: 0.18,
+    threeBet: 0.21,
+    coldCall: 0.42,
+    steal: 0.68,
+    cbet: 0.63,
+    barrel: 0.46,
+    defendBlind: 0.52,
+    showdownCurious: 0.24,
+    sizing: [2.4, 3.2],
+    delay: [900, 1800]
+  },
+  "elite-balanced": {
+    openShift: 0,
+    callShift: 0,
+    aggression: 0.52,
+    bluff: 0.16,
+    threeBet: 0.18,
+    coldCall: 0.5,
+    steal: 0.61,
+    cbet: 0.57,
+    barrel: 0.39,
+    defendBlind: 0.58,
+    showdownCurious: 0.28,
+    sizing: [2.5, 3.3],
+    delay: [1000, 1900]
+  },
+  "elite-pressure": {
+    openShift: -2,
+    callShift: -2,
+    aggression: 0.66,
+    bluff: 0.22,
+    threeBet: 0.27,
+    coldCall: 0.36,
+    steal: 0.76,
+    cbet: 0.71,
+    barrel: 0.54,
+    defendBlind: 0.63,
+    showdownCurious: 0.22,
+    sizing: [2.7, 3.6],
+    delay: [850, 1700]
+  },
+  "weak-tight": {
+    openShift: 8,
+    callShift: 8,
+    aggression: 0.24,
+    bluff: 0.05,
+    threeBet: 0.06,
+    coldCall: 0.18,
+    steal: 0.42,
+    cbet: 0.34,
+    barrel: 0.16,
+    defendBlind: 0.26,
+    showdownCurious: 0.14,
+    sizing: [2.4, 2.9],
+    delay: [1100, 2100]
+  },
+  lag: {
+    openShift: -8,
+    callShift: -6,
+    aggression: 0.72,
+    bluff: 0.28,
+    threeBet: 0.23,
+    coldCall: 0.47,
+    steal: 0.82,
+    cbet: 0.72,
+    barrel: 0.51,
+    defendBlind: 0.72,
+    showdownCurious: 0.34,
+    sizing: [2.6, 3.8],
+    delay: [800, 1600]
+  },
+  "calling-station": {
+    openShift: 6,
+    callShift: -10,
+    aggression: 0.2,
+    bluff: 0.04,
+    threeBet: 0.05,
+    coldCall: 0.78,
+    steal: 0.36,
+    cbet: 0.28,
+    barrel: 0.12,
+    defendBlind: 0.83,
+    showdownCurious: 0.72,
+    sizing: [2.3, 2.9],
+    delay: [1000, 2000]
+  },
+  maniac: {
+    openShift: -14,
+    callShift: -12,
+    aggression: 0.84,
+    bluff: 0.36,
+    threeBet: 0.34,
+    coldCall: 0.52,
+    steal: 0.9,
+    cbet: 0.82,
+    barrel: 0.64,
+    defendBlind: 0.8,
+    showdownCurious: 0.48,
+    sizing: [3, 4.2],
+    delay: [650, 1500]
+  }
 };
 
 export const PRE_FLOP_LABELS = {

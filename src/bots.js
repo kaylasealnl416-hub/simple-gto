@@ -13,6 +13,36 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function playerCount(state) {
+  return state.seats.filter((seat) => seat.inHand && !seat.folded).length;
+}
+
+function positionPressure(position) {
+  return {
+    BTN: -8,
+    CO: -5,
+    HJ: -2,
+    MP: 0,
+    "UTG+1": 4,
+    UTG: 7,
+    SB: -1,
+    BB: 2
+  }[position] ?? 0;
+}
+
+function isBlind(position) {
+  return position === "SB" || position === "BB";
+}
+
+function preflopRaiseAmount(state, seat, behavior, multiplierBoost = 1) {
+  const [minMult, maxMult] = behavior.sizing;
+  const unopened = state.currentBet === 0;
+  if (unopened) {
+    return BIG_BLIND * rand(minMult, maxMult) * multiplierBoost;
+  }
+  return state.currentBet * rand(minMult + 0.4, maxMult + 0.7) * multiplierBoost;
+}
+
 function estimatePostflopScore(seat, board) {
   const cards = [...seat.cards, ...board];
   if (cards.length < 5) {
@@ -24,39 +54,86 @@ function estimatePostflopScore(seat, board) {
   return category * 18 + high;
 }
 
+function estimatePairStrength(seat, board) {
+  const ranks = board.map((card) => card.rank);
+  const holeRanks = seat.cards.map((card) => card.rank);
+  const topBoardRank = [...ranks]
+    .map((rank) => "23456789TJQKA".indexOf(rank))
+    .sort((a, b) => b - a)[0];
+  const topHoleRank = holeRanks.map((rank) => "23456789TJQKA".indexOf(rank)).sort((a, b) => b - a)[0];
+  return topHoleRank >= topBoardRank;
+}
+
+function chooseBetFraction(behavior, boardLength, pressureMode = false) {
+  if (pressureMode) {
+    return rand(0.58, 0.9);
+  }
+  if (boardLength === 3) {
+    return rand(0.33, 0.72);
+  }
+  if (boardLength === 4) {
+    return rand(0.46, 0.82);
+  }
+  return rand(0.55, 1.05);
+}
+
 function decidePreflop(state, seat) {
   const behavior = getBehavior(seat);
   const strength = holeCardStrength(seat.cards[0], seat.cards[1]);
   const toCall = Math.max(0, state.currentBet - seat.betStreet);
   const unopened = state.raiseCount === 0;
-  const raiseThreshold = unopened ? 62 + behavior.openShift : 80 + behavior.openShift;
-  const callThreshold = unopened ? 90 : 62 + behavior.callShift;
+  const positionShift = positionPressure(seat.position);
+  const players = playerCount(state);
+  const raiseThreshold = unopened ? 62 + behavior.openShift + positionShift : 80 + behavior.openShift + positionShift;
+  const callThreshold = unopened ? 90 : 62 + behavior.callShift + Math.max(0, positionShift - 2);
   const reraiseThreshold = 92 + behavior.openShift;
+  const lateStealSpot = unopened && ["BTN", "CO", "SB"].includes(seat.position) && players <= 5;
+  const blindDefend = isBlind(seat.position) && toCall > 0;
 
   if (unopened) {
     if (strength >= raiseThreshold) {
       return {
         type: "raise",
-        amount: state.currentBet === 0 ? BIG_BLIND * rand(2.4, 3.2) : state.currentBet * rand(2.8, 3.5)
+        amount: preflopRaiseAmount(state, seat, behavior)
+      };
+    }
+    if (lateStealSpot && Math.random() < behavior.steal && strength >= raiseThreshold - 8) {
+      return {
+        type: "raise",
+        amount: preflopRaiseAmount(state, seat, behavior, 0.96)
       };
     }
     return { type: "fold" };
   }
 
-  if (strength >= reraiseThreshold) {
+  if (strength >= reraiseThreshold || (strength >= raiseThreshold - 3 && Math.random() < behavior.threeBet)) {
     return {
       type: "raise",
-      amount: clamp(state.currentBet * rand(2.8, 3.6), state.currentBet + BIG_BLIND * 2, seat.stack + seat.betStreet)
+      amount: clamp(
+        preflopRaiseAmount(state, seat, behavior, seat.position === "BB" ? 0.92 : 1),
+        state.currentBet + BIG_BLIND * 2,
+        seat.stack + seat.betStreet
+      )
     };
   }
 
   if (strength >= callThreshold) {
-    if (Math.random() < behavior.aggression * 0.18 && strength >= raiseThreshold - 4) {
+    if (Math.random() < behavior.aggression * 0.18 && strength >= raiseThreshold - 4 && Math.random() < behavior.threeBet) {
       return {
         type: "raise",
-        amount: clamp(state.currentBet * rand(2.6, 3.2), state.currentBet + BIG_BLIND * 2, seat.stack + seat.betStreet)
+        amount: clamp(
+          preflopRaiseAmount(state, seat, behavior, 0.92),
+          state.currentBet + BIG_BLIND * 2,
+          seat.stack + seat.betStreet
+        )
       };
     }
+    if (Math.random() < behavior.coldCall || blindDefend) {
+      return { type: "call", amount: toCall };
+    }
+  }
+
+  if (blindDefend && toCall <= BIG_BLIND * 3.5 && strength >= callThreshold - 10 && Math.random() < behavior.defendBlind) {
     return { type: "call", amount: toCall };
   }
 
@@ -72,16 +149,24 @@ function decidePostflop(state, seat) {
   const score = estimatePostflopScore(seat, state.board);
   const toCall = Math.max(0, state.currentBet - seat.betStreet);
   const unopened = state.currentBet === 0;
+  const boardLength = state.board.length;
+  const players = playerCount(state);
+  const isPreflopAggressor = state.preflopAggressorId === seat.id;
+  const pressureMode = behavior.aggression > 0.62 || behavior.bluff > 0.24;
+  const topPairish = estimatePairStrength(seat, state.board);
 
   if (unopened) {
     if (score >= 94) {
-      return { type: "bet", amount: state.pot * rand(0.58, 0.78) };
+      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode) };
+    }
+    if (isPreflopAggressor && boardLength === 3 && players <= 3 && Math.random() < behavior.cbet) {
+      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode && topPairish) };
     }
     if (score >= 72 && Math.random() < behavior.aggression) {
-      return { type: "bet", amount: state.pot * rand(0.33, 0.58) };
+      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode) };
     }
     if (score >= 48 && Math.random() < behavior.bluff) {
-      return { type: "bet", amount: state.pot * rand(0.25, 0.4) };
+      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, false) };
     }
     return { type: "check" };
   }
@@ -90,17 +175,21 @@ function decidePostflop(state, seat) {
     if (Math.random() < behavior.aggression) {
       return {
         type: "raise",
-        amount: clamp(state.currentBet * rand(2.4, 3.2), state.currentBet + BIG_BLIND * 2, seat.stack + seat.betStreet)
+        amount: clamp(
+          state.currentBet * rand(2.35, pressureMode ? 3.6 : 3.1),
+          state.currentBet + BIG_BLIND * 2,
+          seat.stack + seat.betStreet
+        )
       };
     }
     return { type: "call", amount: toCall };
   }
 
-  if (score >= 76) {
+  if (score >= 76 || (topPairish && score >= 58 && Math.random() < behavior.showdownCurious)) {
     return { type: "call", amount: toCall };
   }
 
-  if (score >= 58 && Math.random() < behavior.bluff * 0.9) {
+  if (score >= 58 && Math.random() < behavior.showdownCurious) {
     return { type: "call", amount: toCall };
   }
 
