@@ -220,6 +220,10 @@ function restoreSession(existing) {
   state.reviewOpen = Boolean(existing.sessionSummary);
   state.topUpPrompt = null;
   startSessionTimer();
+  if (!state.reviewOpen && state.session.phase !== "playing") {
+    resumeBetweenHands();
+    return;
+  }
   const actor = state.session.actorIndex != null ? state.session.seats[state.session.actorIndex] : null;
   if (!state.reviewOpen && actor?.inHand && !actor.folded && !actor.allIn) {
     setActor(actor);
@@ -252,6 +256,8 @@ function endSession() {
     recentHands: [...state.session.handHistory].slice(0, 6)
   };
   state.session.sessionSummary = summary;
+  state.session.phase = "review";
+  state.session.actorIndex = null;
   state.rangeOpen = false;
   state.optionsOpen = false;
   state.pauseNotice = null;
@@ -370,6 +376,7 @@ function resetForHand() {
   state.pauseNotice = null;
   state.topUpPrompt = null;
   state.session.lastRake = 0;
+  state.session.phase = "playing";
   state.session.seats.forEach((seat) => {
     seat.betStreet = 0;
     seat.committed = 0;
@@ -391,6 +398,22 @@ function resetForHand() {
   postBlind("SB", SMALL_BLIND);
   postBlind("BB", BIG_BLIND);
   updateDerivedPot();
+}
+
+function markBetweenHands() {
+  if (state.countdownIntervalId) {
+    clearInterval(state.countdownIntervalId);
+    state.countdownIntervalId = null;
+  }
+  if (state.botActionTimer) {
+    clearTimeout(state.botActionTimer);
+    state.botActionTimer = null;
+  }
+  state.session.phase = "betweenHands";
+  state.session.actorIndex = null;
+  state.session.timer.secondsLeft = 0;
+  state.session.timer.expiresAt = 0;
+  state.session.timer.baseDeadline = 0;
 }
 
 function postBlind(position, amount) {
@@ -877,6 +900,7 @@ function showdown() {
 
 function finishHand() {
   autoTopUpBots();
+  markBetweenHands();
   updateSeatResultLabels();
   saveSession();
   if (Date.now() >= state.session.endsAt || state.session.sessionEndingAfterHand) {
@@ -897,6 +921,23 @@ function finishHand() {
     startNextHand();
     render();
   }, revealDelay);
+}
+
+function resumeBetweenHands() {
+  if (Date.now() >= state.session.endsAt || state.session.sessionEndingAfterHand) {
+    endSession();
+    return;
+  }
+  if (state.session.pendingMistake) {
+    state.pauseNotice = state.session.pendingMistake;
+    render();
+    return;
+  }
+  if (maybePromptTopUp()) {
+    render();
+    return;
+  }
+  startNextHand();
 }
 
 function maybePromptTopUp() {
@@ -937,7 +978,6 @@ function startNextHand() {
   state.selectedRangeHand = null;
   const first = firstToActPreflop();
   setActor(first);
-  state.session.phase = "playing";
   saveSession();
   render();
   queueBotIfNeeded();
@@ -945,6 +985,7 @@ function startNextHand() {
 
 function queueBotIfNeeded() {
   if (!state.session || state.session.actorIndex == null) return;
+  if (state.session.phase !== "playing") return;
   const actor = state.session.seats[state.session.actorIndex];
   if (!actor || actor.seatIndex === HERO_SEAT_INDEX || state.reviewOpen || state.pauseNotice) {
     return;
