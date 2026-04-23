@@ -1183,6 +1183,9 @@ function setAutoAction(actionKey) {
 function toggleRange(open) {
   const nextOpen = typeof open === "boolean" ? open : !state.rangeOpen;
   state.rangeOpen = nextOpen && canUsePreflopRange();
+  if (state.rangeOpen) {
+    state.optionsOpen = false;
+  }
   render();
 }
 
@@ -1192,6 +1195,9 @@ function canUsePreflopRange() {
 
 function toggleOptions(open) {
   state.optionsOpen = typeof open === "boolean" ? open : !state.optionsOpen;
+  if (state.optionsOpen) {
+    state.rangeOpen = false;
+  }
   render();
 }
 
