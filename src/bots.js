@@ -115,6 +115,9 @@ function decidePreflop(state, seat) {
         amount: preflopRaiseAmount(state, seat, behavior, 0.96)
       };
     }
+    if (toCall === 0) {
+      return { type: "check" };
+    }
     return { type: "fold" };
   }
 
