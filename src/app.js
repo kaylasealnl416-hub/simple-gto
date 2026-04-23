@@ -218,6 +218,10 @@ function restoreSession(existing) {
   state.reviewOpen = Boolean(existing.sessionSummary);
   state.topUpPrompt = null;
   startSessionTimer();
+  const actor = state.session.actorIndex != null ? state.session.seats[state.session.actorIndex] : null;
+  if (!state.reviewOpen && actor?.inHand && !actor.folded && !actor.allIn) {
+    setActor(actor);
+  }
   render();
   queueBotIfNeeded();
 }
