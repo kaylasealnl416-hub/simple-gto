@@ -1344,7 +1344,7 @@ function renderRangeSheet(hero) {
   const detail = matrix.flat().find((cell) => cell.hand === selected) ?? matrix[0][0];
   return `
     <div class="overlay ${state.rangeOpen ? "open" : ""}" data-action="close-range"></div>
-    <section class="sheet ${state.rangeOpen ? "open" : ""}">
+    <section class="sheet range-sheet ${state.rangeOpen ? "open" : ""}">
       <div class="sheet-panel">
         <div class="sheet-grabber"></div>
         <div class="sheet-header">
