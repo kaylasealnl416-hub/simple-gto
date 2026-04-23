@@ -585,6 +585,10 @@ function recordHandHistory(entry) {
 }
 
 function distributeRake(totalPot) {
+  if (state.session.board.length === 0) {
+    state.session.lastRake = 0;
+    return 0;
+  }
   const rake = Math.min(Math.round(totalPot * RAKE_PERCENT), RAKE_CAP);
   state.session.lastRake = rake;
   return rake;
@@ -1598,7 +1602,7 @@ function bindEvents() {
 
   app.querySelectorAll("[data-action='show-help']").forEach((button) => {
     button.addEventListener("click", () => {
-      window.alert("固定规则：8-max / 10-20 / 200BB。抽水 5% 封顶 3BB。补码参照现金局通用规则，只允许在手与手之间发生。范围表只提供翻前辅助。");
+      window.alert("固定规则：8-max / 10-20 / 200BB。抽水 5% 封顶 3BB，翻前未见翻牌不抽水。补码参照现金局通用规则，只允许在手与手之间发生。范围表只提供翻前辅助。");
     });
   });
 
