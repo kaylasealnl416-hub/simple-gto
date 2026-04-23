@@ -15,7 +15,6 @@
 ## 本机验证
 
 ```powershell
-$env:SystemRoot='C:\WINDOWS'
 bun run verify
 ```
 
