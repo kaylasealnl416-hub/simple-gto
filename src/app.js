@@ -993,6 +993,17 @@ function getQuickSizes(hero) {
     .filter((size, index, list) => list.findIndex((entry) => Math.round(entry.amount) === Math.round(size.amount)) === index);
 }
 
+function canSeatRaise(seat) {
+  const toCall = Math.max(0, state.session.currentBet - seat.betStreet);
+  if (seat.stack <= toCall) {
+    return false;
+  }
+  if (state.session.currentBet === 0) {
+    return true;
+  }
+  return !seat.acted;
+}
+
 function getRaiseBounds(hero) {
   const maxTarget = hero.stack + hero.betStreet;
   const tableMinimum = state.session.street === "preflop" ? BIG_BLIND * 2 : BIG_BLIND;
@@ -1041,9 +1052,11 @@ function heroAvailableActions() {
   hero.selectedRaiseAmount = selected;
   const { minTarget, maxTarget } = getRaiseBounds(hero);
   const isAllInTarget = Math.round(selected) >= Math.round(maxTarget);
+  const raiseAvailable = canSeatRaise(hero);
 
   return {
     available: true,
+    canRaise: raiseAvailable,
     quickSizes,
     selectedAmount: selected,
     minTarget,
@@ -1058,13 +1071,18 @@ function heroAvailableActions() {
         type: toCall > 0 ? "call" : "check",
         label: toCall > 0 ? "跟注" : "过牌",
         detail: toCall > 0 ? formatAmount(toCall) : "0 / 0BB"
-      },
-      {
-        type: isAllInTarget ? "all-in" : unopened ? "bet" : "raise",
-        label: isAllInTarget ? "全下" : unopened ? "下注" : "加注",
-        detail: formatAmount(selected)
       }
-    ]
+    ].concat(
+      raiseAvailable
+        ? [
+            {
+              type: isAllInTarget ? "all-in" : unopened ? "bet" : "raise",
+              label: isAllInTarget ? "全下" : unopened ? "下注" : "加注",
+              detail: formatAmount(selected)
+            }
+          ]
+        : []
+    )
   };
 }
 
@@ -1398,6 +1416,8 @@ function renderActionPanel(hero) {
 
   return `
     <section class="action-panel">
+      ${actionConfig.canRaise
+        ? `
       <div class="bet-tuner">
         <div class="bet-summary">
           <span>目标下注</span>
@@ -1421,8 +1441,9 @@ function renderActionPanel(hero) {
             `
           )
           .join("")}
-      </div>
-      <div class="action-row">
+      </div>`
+        : ""}
+      <div class="action-row ${actionConfig.buttons.length === 2 ? "two-actions" : ""}">
         ${actionConfig.buttons
           .map(
             (button, index) => `

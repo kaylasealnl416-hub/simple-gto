@@ -17,6 +17,17 @@ function playerCount(state) {
   return state.seats.filter((seat) => seat.inHand && !seat.folded).length;
 }
 
+function canSeatRaise(state, seat) {
+  const toCall = Math.max(0, state.currentBet - seat.betStreet);
+  if (seat.stack <= toCall) {
+    return false;
+  }
+  if (state.currentBet === 0) {
+    return true;
+  }
+  return !seat.acted;
+}
+
 function positionPressure(position) {
   return {
     BTN: -8,
@@ -89,6 +100,7 @@ function decidePreflop(state, seat) {
   const reraiseThreshold = 92 + behavior.openShift;
   const lateStealSpot = unopened && ["BTN", "CO", "SB"].includes(seat.position) && players <= 5;
   const blindDefend = isBlind(seat.position) && toCall > 0;
+  const raiseAvailable = canSeatRaise(state, seat);
 
   if (unopened) {
     if (strength >= raiseThreshold) {
@@ -106,7 +118,7 @@ function decidePreflop(state, seat) {
     return { type: "fold" };
   }
 
-  if (strength >= reraiseThreshold || (strength >= raiseThreshold - 3 && Math.random() < behavior.threeBet)) {
+  if (raiseAvailable && (strength >= reraiseThreshold || (strength >= raiseThreshold - 3 && Math.random() < behavior.threeBet))) {
     return {
       type: "raise",
       amount: clamp(
@@ -118,7 +130,7 @@ function decidePreflop(state, seat) {
   }
 
   if (strength >= callThreshold) {
-    if (Math.random() < behavior.aggression * 0.18 && strength >= raiseThreshold - 4 && Math.random() < behavior.threeBet) {
+    if (raiseAvailable && Math.random() < behavior.aggression * 0.18 && strength >= raiseThreshold - 4 && Math.random() < behavior.threeBet) {
       return {
         type: "raise",
         amount: clamp(
@@ -154,6 +166,7 @@ function decidePostflop(state, seat) {
   const isPreflopAggressor = state.preflopAggressorId === seat.id;
   const pressureMode = behavior.aggression > 0.62 || behavior.bluff > 0.24;
   const topPairish = estimatePairStrength(seat, state.board);
+  const raiseAvailable = canSeatRaise(state, seat);
 
   if (unopened) {
     if (score >= 94) {
@@ -172,7 +185,7 @@ function decidePostflop(state, seat) {
   }
 
   if (score >= 102) {
-    if (Math.random() < behavior.aggression) {
+    if (raiseAvailable && Math.random() < behavior.aggression) {
       return {
         type: "raise",
         amount: clamp(
