@@ -411,6 +411,7 @@ function markBetweenHands() {
   }
   state.session.phase = "betweenHands";
   state.session.actorIndex = null;
+  state.rangeOpen = false;
   state.session.timer.secondsLeft = 0;
   state.session.timer.expiresAt = 0;
   state.session.timer.baseDeadline = 0;
@@ -803,6 +804,9 @@ function resetStreetBets() {
 function advanceStreet() {
   resetStreetBets();
   dealNextStreetCard();
+  if (state.session.street !== "preflop") {
+    state.rangeOpen = false;
+  }
   if (state.session.street === "showdown") {
     showdown();
     return;
@@ -831,6 +835,9 @@ function runBoardToShowdown() {
     }
     resetStreetBets();
     dealNextStreetCard();
+    if (state.session.street !== "preflop") {
+      state.rangeOpen = false;
+    }
     render();
     state.streetRunoutTimer = setTimeout(continueRunout, 380);
   };
@@ -1173,8 +1180,13 @@ function setAutoAction(actionKey) {
 }
 
 function toggleRange(open) {
-  state.rangeOpen = typeof open === "boolean" ? open : !state.rangeOpen;
+  const nextOpen = typeof open === "boolean" ? open : !state.rangeOpen;
+  state.rangeOpen = nextOpen && canUsePreflopRange();
   render();
+}
+
+function canUsePreflopRange() {
+  return Boolean(state.session && state.session.phase === "playing" && state.session.street === "preflop");
 }
 
 function toggleOptions(open) {
@@ -1274,6 +1286,9 @@ function renderSeat(seat) {
 }
 
 function renderRangeSheet(hero) {
+  if (!canUsePreflopRange()) {
+    return "";
+  }
   const recommendation = getRecommendationForHand(state.session, hero);
   const matrix = buildRangeMatrix(recommendation.position, recommendation.spot);
   const selected = state.selectedRangeHand ?? classifyHoleCards(hero.cards[0], hero.cards[1]) ?? matrix[0][0].hand;
@@ -1568,7 +1583,9 @@ function renderTable() {
           <button
             type="button"
             class="dealer-button strategy-trigger"
-            data-action="open-range">
+            data-action="open-range"
+            ${canUsePreflopRange() ? "" : "disabled"}
+            title="范围表仅翻前可用">
             🂠
           </button>
           <div class="hero-cards">
@@ -1577,7 +1594,7 @@ function renderTable() {
         </section>
         ${renderActionPanel(hero)}
         <section class="bottom-nav">
-          <button class="pill-button ${state.rangeOpen ? "active" : ""}" data-action="open-range">策略</button>
+          <button class="pill-button ${state.rangeOpen ? "active" : ""}" data-action="open-range" ${canUsePreflopRange() ? "" : "disabled"}>策略</button>
           <button class="pill-button ${state.optionsOpen ? "active" : ""}" data-action="open-options">选项</button>
         </section>
       </div>
