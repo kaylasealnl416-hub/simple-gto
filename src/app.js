@@ -1033,6 +1033,7 @@ function adjustSelectedRaise(direction) {
 function heroAvailableActions() {
   const hero = getHeroSeat();
   const toCall = Math.max(0, state.session.currentBet - hero.betStreet);
+  const callAmount = Math.min(toCall, hero.stack);
   const unopened = state.session.currentBet === 0;
 
   if (!hero || state.session.actorIndex !== HERO_SEAT_INDEX || state.reviewOpen || state.pauseNotice) {
@@ -1069,8 +1070,8 @@ function heroAvailableActions() {
       },
       {
         type: toCall > 0 ? "call" : "check",
-        label: toCall > 0 ? "跟注" : "过牌",
-        detail: toCall > 0 ? formatAmount(toCall) : "0 / 0BB"
+        label: toCall > 0 ? (callAmount < toCall ? "全下跟注" : "跟注") : "过牌",
+        detail: toCall > 0 ? formatAmount(callAmount) : "0 / 0BB"
       }
     ].concat(
       raiseAvailable
