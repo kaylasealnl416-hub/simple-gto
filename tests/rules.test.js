@@ -7,6 +7,7 @@ import {
   createDeck,
   evaluateSeven,
   formatAmount,
+  normalizeRaiseTarget,
   rakeablePotAmount,
   uncalledAmountForWinner
 } from "../src/poker.js";
@@ -64,6 +65,24 @@ describe("poker primitives", () => {
   test("amount display keeps cash and BB together", () => {
     expect(formatAmount(30)).toBe("30 / 1.5BB");
     expect(formatAmount(BIG_BLIND * 3)).toBe("60 / 3BB");
+  });
+
+  test("raise target enforces full min raise unless player is all-in short", () => {
+    expect(normalizeRaiseTarget({
+      previousBet: 120,
+      minRaiseTo: 220,
+      stack: 4000,
+      betStreet: 0,
+      requestedTarget: 160
+    })).toBe(220);
+
+    expect(normalizeRaiseTarget({
+      previousBet: 120,
+      minRaiseTo: 220,
+      stack: 180,
+      betStreet: 0,
+      requestedTarget: 160
+    })).toBe(180);
   });
 });
 

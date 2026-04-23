@@ -23,6 +23,7 @@ import {
   formatAmount,
   handCategory,
   isRedSuit,
+  normalizeRaiseTarget,
   rakeablePotAmount,
   uncalledAmountForWinner
 } from "./poker.js";
@@ -708,8 +709,13 @@ function commitAction(seat, type, amount = 0) {
   } else if (type === "bet" || type === "raise") {
     const lastFullRaiseSize = Math.max(BIG_BLIND, state.session.minRaiseTo - previousBet);
     const requestedTarget = Math.round(amount);
-    const floorTarget = previousBet === 0 ? Math.max(requestedTarget, 1) : Math.max(requestedTarget, previousBet + 1);
-    const target = previousBet === 0 ? Math.max(floorTarget, Math.min(state.session.minRaiseTo, seat.stack + seat.betStreet)) : floorTarget;
+    const target = normalizeRaiseTarget({
+      previousBet,
+      minRaiseTo: state.session.minRaiseTo,
+      stack: seat.stack,
+      betStreet: seat.betStreet,
+      requestedTarget
+    });
     const commit = Math.min(target - seat.betStreet, seat.stack);
     seat.stack -= commit;
     seat.betStreet += commit;

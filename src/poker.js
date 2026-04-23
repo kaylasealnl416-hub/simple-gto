@@ -187,6 +187,15 @@ export function formatAmount(amount) {
   return `${Math.round(amount)} / ${bbText}BB`;
 }
 
+export function normalizeRaiseTarget({ previousBet, minRaiseTo, stack, betStreet, requestedTarget }) {
+  const maxTarget = stack + betStreet;
+  const floorTarget = previousBet === 0
+    ? Math.max(Math.round(requestedTarget), 1)
+    : Math.max(Math.round(requestedTarget), previousBet + 1);
+  const legalMinimumOrAllIn = Math.min(minRaiseTo, maxTarget);
+  return Math.max(floorTarget, legalMinimumOrAllIn);
+}
+
 export function buildSidePots(seats) {
   const commitments = [...new Set(seats.filter((seat) => seat.committed > 0).map((seat) => seat.committed))].sort((a, b) => a - b);
   let previous = 0;
