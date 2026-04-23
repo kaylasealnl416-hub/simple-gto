@@ -412,6 +412,7 @@ function markBetweenHands() {
   state.session.phase = "betweenHands";
   state.session.actorIndex = null;
   state.rangeOpen = false;
+  state.optionsOpen = false;
   state.session.timer.secondsLeft = 0;
   state.session.timer.expiresAt = 0;
   state.session.timer.baseDeadline = 0;
