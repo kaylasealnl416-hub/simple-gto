@@ -22,7 +22,9 @@ import {
   evaluateSeven,
   formatAmount,
   handCategory,
-  isRedSuit
+  isRedSuit,
+  rakeablePotAmount,
+  uncalledAmountForWinner
 } from "./poker.js";
 
 const STORAGE_KEY = "simple-gto-v1-session";
@@ -778,7 +780,8 @@ function resolveActionFlow(seat) {
 function awardWithoutShowdown(winner) {
   state.session.revealedSeatIds = [];
   const total = state.session.seats.reduce((sum, seat) => sum + seat.committed, 0);
-  const rake = distributeRake(total);
+  const rakeableTotal = total - uncalledAmountForWinner(state.session.seats, winner.id);
+  const rake = distributeRake(rakeableTotal);
   winner.stack += total - rake;
   recordHandHistory({
     handNumber: state.session.handNumber,
@@ -890,11 +893,14 @@ function showdown() {
   });
 
   const totalPot = state.session.seats.reduce((sum, seat) => sum + seat.committed, 0);
-  let remainingRake = distributeRake(totalPot);
+  let remainingRake = distributeRake(rakeablePotAmount(pots));
   const winnersSummary = new Map();
 
   for (const pot of pots) {
     const eligible = contenders.filter((seat) => pot.eligible.includes(seat.id));
+    if (!eligible.length) {
+      continue;
+    }
     eligible.sort((a, b) => {
       const scoreA = evaluations.get(a.id);
       const scoreB = evaluations.get(b.id);
@@ -908,7 +914,7 @@ function showdown() {
     const winners = eligible.filter(
       (seat) => JSON.stringify(evaluations.get(seat.id)) === JSON.stringify(bestScore)
     );
-    const potRake = Math.min(remainingRake, pot.amount);
+    const potRake = pot.eligible.length > 1 ? Math.min(remainingRake, pot.amount) : 0;
     const distributable = pot.amount - potRake;
     remainingRake -= potRake;
     const orderedWinners = showdownOrder(winners);

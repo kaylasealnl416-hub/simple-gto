@@ -1,0 +1,10 @@
+{
+  "name": "simple-gto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "build:check": "bun build ./src/app.js --target=browser --outdir=.tmp-bun-build"
+  }
+}

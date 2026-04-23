@@ -205,6 +205,22 @@ export function buildSidePots(seats) {
   return pots;
 }
 
+export function rakeablePotAmount(pots) {
+  return pots
+    .filter((pot) => pot.eligible.length > 1)
+    .reduce((sum, pot) => sum + pot.amount, 0);
+}
+
+export function uncalledAmountForWinner(seats, winnerId) {
+  const winner = seats.find((seat) => seat.id === winnerId);
+  if (!winner) return 0;
+  const otherMax = Math.max(
+    0,
+    ...seats.filter((seat) => seat.id !== winnerId).map((seat) => seat.committed)
+  );
+  return Math.max(0, winner.committed - otherMax);
+}
+
 export function handCategory(cards) {
   const result = evaluateSeven(cards);
   const category = result.score[0];
