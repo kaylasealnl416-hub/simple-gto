@@ -872,6 +872,7 @@ function showdown() {
 function finishHand() {
   autoTopUpBots();
   updateSeatResultLabels();
+  saveSession();
   if (Date.now() >= state.session.endsAt) {
     endSession();
     return;
