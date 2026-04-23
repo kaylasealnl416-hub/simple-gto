@@ -250,6 +250,10 @@ function endSession() {
     recentHands: [...state.session.handHistory].slice(0, 6)
   };
   state.session.sessionSummary = summary;
+  state.rangeOpen = false;
+  state.optionsOpen = false;
+  state.pauseNotice = null;
+  state.topUpPrompt = null;
   state.reviewOpen = true;
   saveSession();
   render();
