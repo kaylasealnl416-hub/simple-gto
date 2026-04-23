@@ -584,6 +584,14 @@ function distributeRake(totalPot) {
   return rake;
 }
 
+function showdownOrder(seats) {
+  return [...seats].sort((left, right) => {
+    const leftOrder = (left.seatIndex - state.session.dealerIndex + 8) % 8;
+    const rightOrder = (right.seatIndex - state.session.dealerIndex + 8) % 8;
+    return leftOrder - rightOrder;
+  });
+}
+
 function commitAction(seat, type, amount = 0) {
   if (!seat) return;
   if (state.botActionTimer) {
@@ -621,13 +629,19 @@ function commitAction(seat, type, amount = 0) {
       seat.allIn = true;
     }
   } else if (type === "bet" || type === "raise") {
-    const target = Math.max(amount, state.session.minRaiseTo);
+    const lastFullRaiseSize = Math.max(BIG_BLIND, state.session.minRaiseTo - previousBet);
+    const requestedTarget = Math.round(amount);
+    const floorTarget = previousBet === 0 ? Math.max(requestedTarget, 1) : Math.max(requestedTarget, previousBet + 1);
+    const target = previousBet === 0 ? Math.max(floorTarget, Math.min(state.session.minRaiseTo, seat.stack + seat.betStreet)) : floorTarget;
     const commit = Math.min(target - seat.betStreet, seat.stack);
     seat.stack -= commit;
     seat.betStreet += commit;
     seat.committed += commit;
+    const raiseSize = seat.betStreet - previousBet;
+    const isFullRaise =
+      previousBet === 0 ? seat.betStreet >= state.session.minRaiseTo : raiseSize >= lastFullRaiseSize;
     state.session.currentBet = seat.betStreet;
-    state.session.minRaiseTo = state.session.currentBet + Math.max(BIG_BLIND, state.session.currentBet - previousBet);
+    state.session.minRaiseTo = state.session.currentBet + (isFullRaise ? Math.max(BIG_BLIND, raiseSize) : lastFullRaiseSize);
     state.session.raiseCount += 1;
     state.session.streetAggressorId = seat.id;
     if (isPreflop) {
@@ -638,11 +652,13 @@ function commitAction(seat, type, amount = 0) {
       seat.allIn = true;
       seat.status = "全下";
     }
-    state.session.seats.forEach((entry) => {
-      if (entry.seatIndex !== seat.seatIndex && entry.inHand && !entry.folded && !entry.allIn) {
-        entry.acted = false;
-      }
-    });
+    if (previousBet === 0 || isFullRaise) {
+      state.session.seats.forEach((entry) => {
+        if (entry.seatIndex !== seat.seatIndex && entry.inHand && !entry.folded && !entry.allIn) {
+          entry.acted = false;
+        }
+      });
+    }
   }
 
   if (isPreflop && ["call", "raise", "bet"].includes(type) && !seat.handFlags.vpipMarked) {
@@ -805,9 +821,15 @@ function showdown() {
     const potRake = Math.min(remainingRake, pot.amount);
     const distributable = pot.amount - potRake;
     remainingRake -= potRake;
-    const share = distributable / winners.length;
-    winners.forEach((seat) => {
+    const orderedWinners = showdownOrder(winners);
+    const share = Math.floor(distributable / orderedWinners.length);
+    let oddChips = distributable - share * orderedWinners.length;
+    orderedWinners.forEach((seat) => {
       seat.stack += share;
+      if (oddChips > 0) {
+        seat.stack += 1;
+        oddChips -= 1;
+      }
       winnersSummary.set(seat.id, seat);
     });
   }
@@ -1093,6 +1115,11 @@ function formatSessionTime(ms) {
   return `${minutes}:${seconds}`;
 }
 
+function compactCardText(cards) {
+  if (!cards?.length) return "无";
+  return cards.map((card) => cardLabel(card)).join(" ");
+}
+
 function renderPlayingCard(card, faceDown = false) {
   if (!card || faceDown) {
     return `<div class="playing-card back"></div>`;
@@ -1218,7 +1245,7 @@ function renderOptionsSheet() {
                 .map(
                   (hand) => `
                     <li class="history-item">
-                      <span>#${hand.handNumber} · ${hand.street}</span>
+                      <span>#${hand.handNumber} · ${hand.street}<br><small>你：${compactCardText(hand.heroCards)} · 牌面：${compactCardText(hand.board)}</small></span>
                       <span>${hand.result}</span>
                     </li>
                   `
@@ -1306,7 +1333,7 @@ function renderReviewCard() {
               .map(
                 (hand) => `
                   <li class="history-item">
-                    <span>#${hand.handNumber} · ${hand.street}</span>
+                    <span>#${hand.handNumber} · ${hand.street}<br><small>你：${compactCardText(hand.heroCards)} · 牌面：${compactCardText(hand.board)}</small></span>
                     <span>${hand.result}</span>
                   </li>
                 `

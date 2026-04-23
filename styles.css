@@ -722,6 +722,13 @@ button:disabled {
   font-size: 13px;
 }
 
+.history-item small {
+  display: inline-block;
+  margin-top: 4px;
+  color: rgba(237, 245, 243, 0.72);
+  line-height: 1.45;
+}
+
 .history-item:first-child {
   border-top: 0;
   padding-top: 2px;
