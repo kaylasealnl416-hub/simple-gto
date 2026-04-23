@@ -224,6 +224,11 @@ function restoreSession(existing) {
     resumeBetweenHands();
     return;
   }
+  if (!state.reviewOpen && shouldResumeRunout()) {
+    runBoardToShowdown();
+    render();
+    return;
+  }
   const actor = state.session.actorIndex != null ? state.session.seats[state.session.actorIndex] : null;
   if (!state.reviewOpen && actor?.inHand && !actor.folded && !actor.allIn) {
     setActor(actor);
@@ -471,6 +476,15 @@ function activeContenders() {
 
 function remainingDeciders() {
   return state.session.seats.filter((seat) => seat.inHand && !seat.folded && !seat.allIn);
+}
+
+function shouldResumeRunout() {
+  return (
+    state.session?.phase === "playing" &&
+    activeContenders().length > 1 &&
+    remainingDeciders().length === 0 &&
+    state.session.street !== "showdown"
+  );
 }
 
 function everyoneMatched() {
@@ -839,6 +853,15 @@ function runBoardToShowdown() {
   if (state.streetRunoutTimer) {
     clearTimeout(state.streetRunoutTimer);
   }
+  if (state.countdownIntervalId) {
+    clearInterval(state.countdownIntervalId);
+    state.countdownIntervalId = null;
+  }
+  state.session.actorIndex = null;
+  state.session.timer.secondsLeft = 0;
+  state.session.timer.expiresAt = 0;
+  state.session.timer.baseDeadline = 0;
+  saveSession();
   const continueRunout = () => {
     if (!state.session) return;
     if (state.session.street === "river") {
