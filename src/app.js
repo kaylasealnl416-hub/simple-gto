@@ -175,6 +175,7 @@ function createSession() {
     lastMistake: null,
     lastRake: 0,
     revealedSeatIds: [],
+    sessionEndingAfterHand: false,
     timer: {
       secondsLeft: 0,
       expiresAt: 0,
@@ -212,6 +213,7 @@ function restoreSession(existing) {
   if (!state.session.lastMistake) {
     state.session.lastMistake = state.session.pendingMistake ?? null;
   }
+  state.session.sessionEndingAfterHand = Boolean(state.session.sessionEndingAfterHand);
   updateSeatResultLabels();
   state.rangeOpen = false;
   state.optionsOpen = false;
@@ -285,7 +287,11 @@ function startSessionTimer() {
   state.timerIntervalId = setInterval(() => {
     if (!state.session) return;
     if (Date.now() >= state.session.endsAt) {
-      endSession();
+      state.session.sessionEndingAfterHand = true;
+      renderTopOnly();
+      if (state.session.phase !== "playing") {
+        endSession();
+      }
       return;
     }
     renderTopOnly();
@@ -873,7 +879,7 @@ function finishHand() {
   autoTopUpBots();
   updateSeatResultLabels();
   saveSession();
-  if (Date.now() >= state.session.endsAt) {
+  if (Date.now() >= state.session.endsAt || state.session.sessionEndingAfterHand) {
     endSession();
     return;
   }
