@@ -1421,6 +1421,7 @@ function renderOptionsSheet() {
           </div>
           <button class="modal-action" data-action="restart-session">重新开始</button>
           <button class="modal-action" data-action="show-help">规则说明</button>
+          <button class="modal-action" data-action="back-home">返回首页</button>
           <button class="modal-action danger" data-action="end-session">结束本场</button>
         </div>
       </div>
