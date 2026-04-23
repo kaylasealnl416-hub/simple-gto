@@ -172,6 +172,7 @@ function createSession() {
     actorIndex: null,
     handHistory: [],
     pendingMistake: null,
+    lastMistake: null,
     lastRake: 0,
     revealedSeatIds: [],
     timer: {
@@ -208,6 +209,9 @@ function restoreSession(existing) {
   if (!Array.isArray(state.session.revealedSeatIds)) {
     state.session.revealedSeatIds = [];
   }
+  if (!state.session.lastMistake) {
+    state.session.lastMistake = state.session.pendingMistake ?? null;
+  }
   updateSeatResultLabels();
   state.rangeOpen = false;
   state.optionsOpen = false;
@@ -238,7 +242,7 @@ function endSession() {
         result: seatNetResult(seat)
       }))
       .sort((left, right) => right.result - left.result),
-    mistake: state.session.pendingMistake,
+    mistake: state.session.lastMistake ?? state.session.pendingMistake,
     recentHands: [...state.session.handHistory].slice(0, 6)
   };
   state.session.sessionSummary = summary;
@@ -558,6 +562,7 @@ function captureHeroMistake(seat, actionType) {
       hand: classifyHoleCards(seat.cards[0], seat.cards[1]),
       recommendation: expected.label
     };
+    state.session.lastMistake = state.session.pendingMistake;
     return;
   }
 
@@ -570,6 +575,7 @@ function captureHeroMistake(seat, actionType) {
       hand: classifyHoleCards(seat.cards[0], seat.cards[1]),
       recommendation: "当前只有翻前范围表可直接回看；翻后先关注本场总结。"
     };
+    state.session.lastMistake = state.session.pendingMistake;
   }
 }
 
@@ -711,7 +717,7 @@ function awardWithoutShowdown(winner) {
     pot: total,
     rake,
     result: `${winner.name} 直接赢下 ${formatAmount(total - rake)}`,
-    board: [],
+    board: [...state.session.board],
     heroCards: [...getHeroSeat().cards]
   });
   finishHand();
@@ -989,7 +995,8 @@ function getQuickSizes(hero) {
 
 function getRaiseBounds(hero) {
   const maxTarget = hero.stack + hero.betStreet;
-  const minTarget = Math.min(maxTarget, Math.max(state.session.minRaiseTo, BIG_BLIND * 2));
+  const tableMinimum = state.session.street === "preflop" ? BIG_BLIND * 2 : BIG_BLIND;
+  const minTarget = Math.min(maxTarget, Math.max(state.session.minRaiseTo, tableMinimum));
   return {
     minTarget,
     maxTarget
