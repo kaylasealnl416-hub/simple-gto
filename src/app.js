@@ -1071,18 +1071,27 @@ function heroAvailableActions() {
     selectedAmount: selected,
     minTarget,
     maxTarget,
-    buttons: [
-      {
-        type: "fold",
-        label: toCall > 0 ? "弃牌" : "过牌/弃牌",
-        detail: ""
-      },
-      {
-        type: toCall > 0 ? "call" : "check",
-        label: toCall > 0 ? (callAmount < toCall ? "全下跟注" : "跟注") : "过牌",
-        detail: toCall > 0 ? formatAmount(callAmount) : "0 / 0BB"
-      }
-    ].concat(
+    buttons: (toCall > 0
+      ? [
+          {
+            type: "fold",
+            label: "弃牌",
+            detail: ""
+          },
+          {
+            type: "call",
+            label: callAmount < toCall ? "全下跟注" : "跟注",
+            detail: formatAmount(callAmount)
+          }
+        ]
+      : [
+          {
+            type: "check",
+            label: "过牌",
+            detail: "0 / 0BB"
+          }
+        ]
+    ).concat(
       raiseAvailable
         ? [
             {
@@ -1457,8 +1466,8 @@ function renderActionPanel(hero) {
       <div class="action-row ${actionConfig.buttons.length === 2 ? "two-actions" : ""}">
         ${actionConfig.buttons
           .map(
-            (button, index) => `
-              <button class="action-chip ${index === 1 ? "primary" : ""} ${button.type === "raise" || button.type === "bet" || button.type === "all-in" ? "raise" : ""}" data-play-action="${button.type}">
+            (button) => `
+              <button class="action-chip ${button.type === "call" || button.type === "check" ? "primary" : ""} ${button.type === "raise" || button.type === "bet" || button.type === "all-in" ? "raise" : ""}" data-play-action="${button.type}">
                 ${button.label}
                 <small>${button.detail || "&nbsp;"}</small>
               </button>
