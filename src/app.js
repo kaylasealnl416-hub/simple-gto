@@ -1355,6 +1355,7 @@ function renderReviewCard() {
           <p>你的本场结果：${summary.heroResult >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(summary.heroResult))}</p>
           <p>最终筹码：${formatAmount(summary.heroFinalStack)} · 用时 ${formatSessionTime(summary.durationMs)} · 共 ${summary.handCount} 手</p>
           <p>${summary.mistake ? `最大问题：${summary.mistake.street} · ${summary.mistake.summary}` : "本场没有记录到明显偏离。"} </p>
+          ${summary.mistake ? `<p class="muted">问题手牌：${summary.mistake.hand} · 建议：${summary.mistake.recommendation}</p>` : ""}
         </div>
         <div class="review-section">
           <strong class="review-subtitle">最近完成的手牌</strong>
