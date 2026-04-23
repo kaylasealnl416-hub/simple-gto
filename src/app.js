@@ -1017,10 +1017,11 @@ function queueBotIfNeeded() {
 function getQuickSizes(hero) {
   const toCall = Math.max(0, state.session.currentBet - hero.betStreet);
   const unopened = state.session.currentBet === 0;
+  const preflopUnraised = state.session.street === "preflop" && state.session.raiseCount === 0;
   const maxTarget = hero.stack + hero.betStreet;
 
   if (state.session.street === "preflop") {
-    if (unopened) {
+    if (preflopUnraised) {
       return [2.5, 3, 4, 6]
         .map((bb) => {
           const target = Math.min(Math.round(bb * BIG_BLIND), maxTarget);

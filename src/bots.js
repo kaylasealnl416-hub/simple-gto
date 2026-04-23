@@ -47,7 +47,7 @@ function isBlind(position) {
 
 function preflopRaiseAmount(state, seat, behavior, multiplierBoost = 1) {
   const [minMult, maxMult] = behavior.sizing;
-  const unopened = state.currentBet === 0;
+  const unopened = state.raiseCount === 0;
   if (unopened) {
     return BIG_BLIND * rand(minMult, maxMult) * multiplierBoost;
   }
