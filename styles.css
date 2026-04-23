@@ -563,6 +563,8 @@ button:disabled {
 }
 
 .sheet-panel {
+  max-height: 68vh;
+  overflow: hidden;
   background: rgba(17, 24, 23, 0.98);
   border-top-left-radius: 30px;
   border-top-right-radius: 30px;
@@ -609,7 +611,9 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(13, minmax(0, 1fr));
   gap: 3px;
+  max-height: 42vh;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .range-cell {
@@ -681,6 +685,12 @@ button:disabled {
 .pause-stack {
   display: grid;
   gap: 10px;
+}
+
+.options-stack {
+  max-height: 52vh;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .prompt-actions {
