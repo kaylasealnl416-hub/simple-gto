@@ -267,6 +267,18 @@ function endSession() {
   render();
 }
 
+function requestEndSession() {
+  if (!state.session) return;
+  if (state.session.phase === "playing") {
+    state.session.sessionEndingAfterHand = true;
+    state.optionsOpen = false;
+    saveSession();
+    render();
+    return;
+  }
+  endSession();
+}
+
 function clearTimers() {
   if (state.timerIntervalId) {
     clearInterval(state.timerIntervalId);
@@ -1219,7 +1231,7 @@ function renderTopOnly() {
   const timeBank = document.querySelector("[data-role='time-bank']");
   if (!topTimer || !actionTimer || !timeBank || !state.session || state.session.actorIndex == null) return;
   const sessionLeft = Math.max(0, state.session.endsAt - Date.now());
-  topTimer.textContent = formatSessionTime(sessionLeft);
+  topTimer.textContent = state.session.sessionEndingAfterHand ? "本手后结束" : formatSessionTime(sessionLeft);
   actionTimer.textContent = `${state.session.timer.secondsLeft}s`;
   timeBank.textContent = `${state.session.seats[state.session.actorIndex].timeBankSeconds}s`;
 }
@@ -1558,7 +1570,9 @@ function renderActionPanel(hero) {
 function renderTable() {
   const hero = getHeroSeat();
   const actor = state.session.actorIndex != null ? state.session.seats[state.session.actorIndex] : null;
-  const sessionLeft = formatSessionTime(state.session.endsAt - Date.now());
+  const sessionLeft = state.session.sessionEndingAfterHand
+    ? "本手后结束"
+    : formatSessionTime(state.session.endsAt - Date.now());
   return `
     <div class="app-shell">
       <div class="table-screen">
@@ -1685,7 +1699,7 @@ function bindEvents() {
   });
 
   app.querySelectorAll("[data-action='end-session']").forEach((button) => {
-    button.addEventListener("click", endSession);
+    button.addEventListener("click", requestEndSession);
   });
 
   app.querySelectorAll("[data-action='restart-session']").forEach((button) => {
