@@ -919,6 +919,7 @@ function skipTopUp() {
 
 function startNextHand() {
   resetForHand();
+  state.selectedRangeHand = null;
   const first = firstToActPreflop();
   setActor(first);
   state.session.phase = "playing";
