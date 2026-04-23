@@ -921,35 +921,73 @@ function queueBotIfNeeded() {
 function getQuickSizes(hero) {
   const toCall = Math.max(0, state.session.currentBet - hero.betStreet);
   const unopened = state.session.currentBet === 0;
+  const maxTarget = hero.stack + hero.betStreet;
 
   if (state.session.street === "preflop") {
     if (unopened) {
-      return [2.5, 3, 4, 6].map((bb) => ({
-        label: `${Math.round(bb * BIG_BLIND)} / ${bb}BB`,
-        amount: bb * BIG_BLIND
-      }));
+      return [2.5, 3, 4, 6]
+        .map((bb) => {
+          const target = Math.min(Math.round(bb * BIG_BLIND), maxTarget);
+          return {
+            label: `${Math.round(target)} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
+            amount: target
+          };
+        })
+        .filter((size, index, list) => list.findIndex((entry) => Math.round(entry.amount) === Math.round(size.amount)) === index);
     }
     const base = Math.max(state.session.currentBet, toCall + BIG_BLIND);
-    return [2.6, 3, 3.6, 4.5].map((multiplier) => {
-      const target = Math.round(base * multiplier);
+    return [2.6, 3, 3.6, 4.5]
+      .map((multiplier) => {
+        const target = Math.min(Math.round(base * multiplier), maxTarget);
+        return {
+          label: `${target} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
+          amount: target
+        };
+      })
+      .filter((size, index, list) => list.findIndex((entry) => Math.round(entry.amount) === Math.round(size.amount)) === index);
+  }
+
+  const betBase = unopened ? state.session.pot : state.session.currentBet + state.session.pot * 0.5;
+  return [0.33, 0.5, 0.75, 1]
+    .map((pct) => {
+      const target = Math.min(
+        Math.max(
+          state.session.currentBet + BIG_BLIND,
+          Math.round((unopened ? state.session.pot : betBase) * pct + (unopened ? 0 : state.session.currentBet))
+        ),
+        maxTarget
+      );
       return {
         label: `${target} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
         amount: target
       };
-    });
-  }
+    })
+    .filter((size, index, list) => list.findIndex((entry) => Math.round(entry.amount) === Math.round(size.amount)) === index);
+}
 
-  const betBase = unopened ? state.session.pot : state.session.currentBet + state.session.pot * 0.5;
-  return [0.33, 0.5, 0.75, 1].map((pct) => {
-    const target = Math.max(
-      state.session.currentBet + BIG_BLIND,
-      Math.round((unopened ? state.session.pot : betBase) * pct + (unopened ? 0 : state.session.currentBet))
-    );
-    return {
-      label: `${target} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
-      amount: target
-    };
-  });
+function getRaiseBounds(hero) {
+  const maxTarget = hero.stack + hero.betStreet;
+  const minTarget = Math.min(maxTarget, Math.max(state.session.minRaiseTo, BIG_BLIND * 2));
+  return {
+    minTarget,
+    maxTarget
+  };
+}
+
+function normalizeRaiseAmount(hero, amount) {
+  const { minTarget, maxTarget } = getRaiseBounds(hero);
+  if (maxTarget <= 0) return 0;
+  return Math.min(maxTarget, Math.max(minTarget, Math.round(amount)));
+}
+
+function setSelectedRaiseAmount(amount) {
+  const hero = getHeroSeat();
+  hero.selectedRaiseAmount = normalizeRaiseAmount(hero, amount);
+}
+
+function adjustSelectedRaise(direction) {
+  const step = state.session.street === "preflop" ? SMALL_BLIND : BIG_BLIND;
+  setSelectedRaiseAmount(getSelectedRaiseAmount() + step * direction);
 }
 
 function heroAvailableActions() {
@@ -961,16 +999,26 @@ function heroAvailableActions() {
     return {
       available: false,
       quickSizes: [],
-      buttons: []
+      buttons: [],
+      selectedAmount: 0,
+      minTarget: 0,
+      maxTarget: 0
     };
   }
 
   const quickSizes = getQuickSizes(hero);
-  const selected = hero.selectedRaiseAmount ?? quickSizes[1]?.amount ?? BIG_BLIND * 3;
+  const fallback = quickSizes[1]?.amount ?? BIG_BLIND * 3;
+  const selected = normalizeRaiseAmount(hero, hero.selectedRaiseAmount ?? fallback);
+  hero.selectedRaiseAmount = selected;
+  const { minTarget, maxTarget } = getRaiseBounds(hero);
+  const isAllInTarget = Math.round(selected) >= Math.round(maxTarget);
 
   return {
     available: true,
     quickSizes,
+    selectedAmount: selected,
+    minTarget,
+    maxTarget,
     buttons: [
       {
         type: "fold",
@@ -983,8 +1031,8 @@ function heroAvailableActions() {
         detail: toCall > 0 ? formatAmount(toCall) : "0 / 0BB"
       },
       {
-        type: unopened ? "bet" : "raise",
-        label: unopened ? "下注" : "加注",
+        type: isAllInTarget ? "all-in" : unopened ? "bet" : "raise",
+        label: isAllInTarget ? "全下" : unopened ? "下注" : "加注",
         detail: formatAmount(selected)
       }
     ]
@@ -994,7 +1042,7 @@ function heroAvailableActions() {
 function getSelectedRaiseAmount() {
   const hero = getHeroSeat();
   const quickSizes = getQuickSizes(hero);
-  return hero.selectedRaiseAmount ?? quickSizes[1]?.amount ?? BIG_BLIND * 3;
+  return normalizeRaiseAmount(hero, hero.selectedRaiseAmount ?? quickSizes[1]?.amount ?? BIG_BLIND * 3);
 }
 
 function setAutoAction(actionKey) {
@@ -1316,11 +1364,24 @@ function renderActionPanel(hero) {
 
   return `
     <section class="action-panel">
+      <div class="bet-tuner">
+        <div class="bet-summary">
+          <span>目标下注</span>
+          <strong>${formatAmount(actionConfig.selectedAmount)}</strong>
+          <small>最小 ${formatAmount(actionConfig.minTarget)} · 封顶 ${formatAmount(actionConfig.maxTarget)}</small>
+        </div>
+        <div class="bet-controls">
+          <button class="bet-step" data-raise-bound="min">最小</button>
+          <button class="bet-step" data-adjust-raise="-1">-0.5BB</button>
+          <button class="bet-step" data-adjust-raise="1">+0.5BB</button>
+          <button class="bet-step accent" data-raise-bound="max">全下</button>
+        </div>
+      </div>
       <div class="quick-sizes">
         ${actionConfig.quickSizes
           .map(
             (size) => `
-              <button class="quick-size ${Math.round(getSelectedRaiseAmount()) === Math.round(size.amount) ? "active" : ""}" data-raise-amount="${size.amount}">
+              <button class="quick-size ${Math.round(actionConfig.selectedAmount) === Math.round(size.amount) ? "active" : ""}" data-raise-amount="${size.amount}">
                 ${size.label}
               </button>
             `
@@ -1331,7 +1392,7 @@ function renderActionPanel(hero) {
         ${actionConfig.buttons
           .map(
             (button, index) => `
-              <button class="action-chip ${index === 1 ? "primary" : ""} ${button.type === "raise" || button.type === "bet" ? "raise" : ""}" data-play-action="${button.type}">
+              <button class="action-chip ${index === 1 ? "primary" : ""} ${button.type === "raise" || button.type === "bet" || button.type === "all-in" ? "raise" : ""}" data-play-action="${button.type}">
                 ${button.label}
                 <small>${button.detail || "&nbsp;"}</small>
               </button>
@@ -1500,8 +1561,10 @@ function bindEvents() {
       const hero = getHeroSeat();
       if (state.session.actorIndex !== HERO_SEAT_INDEX) return;
       const action = button.dataset.playAction;
-      if (action === "raise" || action === "bet") {
-        commitAction(hero, action, getSelectedRaiseAmount());
+      if (action === "raise" || action === "bet" || action === "all-in") {
+        const resolvedAction =
+          action === "all-in" ? (state.session.currentBet === 0 ? "bet" : "raise") : action;
+        commitAction(hero, resolvedAction, getSelectedRaiseAmount());
       } else {
         commitAction(hero, action);
       }
@@ -1510,8 +1573,23 @@ function bindEvents() {
 
   app.querySelectorAll("[data-raise-amount]").forEach((button) => {
     button.addEventListener("click", () => {
+      setSelectedRaiseAmount(Number(button.dataset.raiseAmount));
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-adjust-raise]").forEach((button) => {
+    button.addEventListener("click", () => {
+      adjustSelectedRaise(Number(button.dataset.adjustRaise));
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-raise-bound]").forEach((button) => {
+    button.addEventListener("click", () => {
       const hero = getHeroSeat();
-      hero.selectedRaiseAmount = Number(button.dataset.raiseAmount);
+      const bounds = getRaiseBounds(hero);
+      setSelectedRaiseAmount(button.dataset.raiseBound === "min" ? bounds.minTarget : bounds.maxTarget);
       render();
     });
   });
