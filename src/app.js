@@ -1343,7 +1343,7 @@ function renderRangeSheet(hero) {
   const selected = state.selectedRangeHand ?? classifyHoleCards(hero.cards[0], hero.cards[1]) ?? matrix[0][0].hand;
   const detail = matrix.flat().find((cell) => cell.hand === selected) ?? matrix[0][0];
   return `
-    <div class="overlay ${state.rangeOpen ? "open" : ""}" data-action="close-range"></div>
+    <div class="overlay range-overlay ${state.rangeOpen ? "open" : ""}" data-action="close-range"></div>
     <section class="sheet range-sheet ${state.rangeOpen ? "open" : ""}">
       <div class="sheet-panel">
         <div class="sheet-grabber"></div>

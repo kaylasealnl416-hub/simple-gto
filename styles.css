@@ -791,6 +791,11 @@ button:disabled {
   pointer-events: auto;
 }
 
+.range-overlay.open {
+  background: transparent;
+  backdrop-filter: none;
+}
+
 .pause-banner {
   position: fixed;
   inset: auto 18px calc(var(--safe-bottom) + 10px);
