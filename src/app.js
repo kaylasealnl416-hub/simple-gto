@@ -634,8 +634,8 @@ function distributeRake(totalPot) {
 
 function showdownOrder(seats) {
   return [...seats].sort((left, right) => {
-    const leftOrder = (left.seatIndex - state.session.dealerIndex + 8) % 8;
-    const rightOrder = (right.seatIndex - state.session.dealerIndex + 8) % 8;
+    const leftOrder = (left.seatIndex - state.session.dealerIndex - 1 + 8) % 8;
+    const rightOrder = (right.seatIndex - state.session.dealerIndex - 1 + 8) % 8;
     return leftOrder - rightOrder;
   });
 }
