@@ -1547,8 +1547,8 @@ function renderReviewCard() {
 function renderPreActionRow(hero) {
   const items = [
     { key: "fold", label: "弃牌" },
-    { key: "check", label: "看牌" },
-    { key: "checkFold", label: "看牌/弃牌" },
+    { key: "check", label: "过牌" },
+    { key: "checkFold", label: "过牌/弃牌" },
     { key: "callAny", label: "跟注任意" }
   ];
   return `
