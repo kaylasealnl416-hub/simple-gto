@@ -8,6 +8,7 @@ coverage/
 playwright-report/
 test-results/
 .tmp-bun-build/
+.tmp-serve*.log
 .DS_Store
 Thumbs.db
 .env
