@@ -158,6 +158,7 @@ function createSession() {
     pendingMistake: null,
     lastMistake: null,
     lastRake: 0,
+    pendingHeroTopUp: false,
     revealedSeatIds: [],
     sessionEndingAfterHand: false,
     timer: {
@@ -198,6 +199,7 @@ function restoreSession(existing) {
     state.session.lastMistake = state.session.pendingMistake ?? null;
   }
   state.session.sessionEndingAfterHand = Boolean(state.session.sessionEndingAfterHand);
+  state.session.pendingHeroTopUp = Boolean(state.session.pendingHeroTopUp);
   updateSeatResultLabels();
   state.rangeOpen = false;
   state.optionsOpen = false;
@@ -356,12 +358,14 @@ function autoTopUpBots() {
   updateSeatResultLabels();
 }
 
-function autoTopUpHeroIfNeeded() {
+function applyPendingHeroTopUp() {
+  if (!state.session.pendingHeroTopUp) return;
   const hero = getHeroSeat();
+  state.session.pendingHeroTopUp = false;
   if (!hero || hero.stack <= 0 || hero.stack >= STARTING_STACK) return;
   const topped = topUpSeatToMax(hero);
   if (topped > 0) {
-    hero.status = "已自动补满";
+    hero.status = "已补满";
   }
   updateSeatResultLabels();
 }
@@ -946,7 +950,7 @@ function showdown() {
 
 function finishHand() {
   autoTopUpBots();
-  autoTopUpHeroIfNeeded();
+  applyPendingHeroTopUp();
   markBetweenHands();
   updateSeatResultLabels();
   saveSession();
@@ -1008,6 +1012,22 @@ function applyTopUp() {
   updateSeatResultLabels();
   saveSession();
   startNextHand();
+}
+
+function requestHeroTopUp() {
+  const hero = getHeroSeat();
+  if (!hero || hero.stack <= 0 || hero.stack >= STARTING_STACK) return;
+  if (state.session.phase === "playing") {
+    state.session.pendingHeroTopUp = true;
+    hero.status = "已预约补码";
+  } else {
+    topUpSeatToMax(hero);
+    state.session.pendingHeroTopUp = false;
+    hero.status = "已补满";
+  }
+  updateSeatResultLabels();
+  saveSession();
+  render();
 }
 
 function skipTopUp() {
@@ -1378,6 +1398,15 @@ function renderRangeSheet(hero) {
 function renderOptionsSheet() {
   const hero = getHeroSeat();
   const heroNet = seatNetResult(hero);
+  const topUpAmount = Math.max(0, STARTING_STACK - hero.stack);
+  const canRequestTopUp = hero.stack > 0 && topUpAmount > 0 && !state.session.pendingHeroTopUp;
+  const topUpLabel = hero.stack >= STARTING_STACK
+    ? "已满 200BB"
+    : state.session.pendingHeroTopUp
+      ? "已预约下手补码"
+      : state.session.phase === "playing"
+        ? "下手补满到 200BB"
+        : "补满到 200BB";
   return `
     <div class="overlay ${state.optionsOpen ? "open" : ""}" data-action="close-options"></div>
     <section class="sheet ${state.optionsOpen ? "open" : ""}">
@@ -1395,6 +1424,11 @@ function renderOptionsSheet() {
             <strong>本场状态</strong>
             <p>当前筹码：${formatAmount(hero.stack)} · 本场 ${heroNet >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(heroNet))}</p>
             <p>已打手数：${state.session.handNumber} · 最近抽水：${formatAmount(state.session.lastRake)}</p>
+          </div>
+          <div class="mini-panel">
+            <strong>补码</strong>
+            <p>${topUpAmount > 0 ? `可补金额：${formatAmount(topUpAmount)}。${state.session.phase === "playing" ? "本手结束后生效。" : "当前可立即补满。"}` : "当前已经是 200BB。"} </p>
+            <button class="modal-action" data-action="request-top-up" ${canRequestTopUp ? "" : "disabled"}>${topUpLabel}</button>
           </div>
           <div class="history-panel">
             <strong>手牌历史</strong>
@@ -1721,6 +1755,10 @@ function bindEvents() {
 
   app.querySelectorAll("[data-action='apply-top-up']").forEach((button) => {
     button.addEventListener("click", applyTopUp);
+  });
+
+  app.querySelectorAll("[data-action='request-top-up']").forEach((button) => {
+    button.addEventListener("click", requestHeroTopUp);
   });
 
   app.querySelectorAll("[data-action='skip-top-up']").forEach((button) => {
