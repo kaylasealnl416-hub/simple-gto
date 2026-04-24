@@ -13,6 +13,7 @@ import {
 import { chooseBotAction, getBotDelayMs } from "./bots.js";
 import { buildRangeMatrix, getRecommendationForHand } from "./ranges.js";
 import { pickArchetypes } from "./tablePool.js";
+import { passiveSeatStatus, shouldPromptTopUp } from "./tableRules.js";
 import {
   buildSidePots,
   cardLabel,
@@ -485,7 +486,7 @@ function setActor(seat) {
   state.session.seats.forEach((entry) => {
     if (entry.inHand && !entry.folded && !entry.allIn) {
       if (entry.seatIndex !== state.session.actorIndex) {
-        entry.status = entry.betStreet === state.session.currentBet ? "等待" : "待跟注";
+        entry.status = passiveSeatStatus(entry, state.session.currentBet);
       }
     }
   });
@@ -977,7 +978,7 @@ function resumeBetweenHands() {
 
 function maybePromptTopUp() {
   const hero = getHeroSeat();
-  if (hero.stack >= STARTING_STACK) {
+  if (!shouldPromptTopUp(hero.stack)) {
     state.topUpPrompt = null;
     return false;
   }
@@ -1434,7 +1435,7 @@ function renderTopUpPrompt() {
       <div class="pause-stack">
         <div>
           <h4>补满筹码</h4>
-          <p>${busted ? "你已经出局。按现金局通行规则，需要在下一手前补码后才能继续。" : "当前筹码低于 200BB。按现金局通行规则，你可以在下一手开始前补满。"}</p>
+          <p>${busted ? "你已经出局。按现金局通行规则，需要在下一手前补码后才能继续。" : "当前筹码明显低于买入上限。按现金局通行规则，你可以在下一手开始前补满。"}</p>
           <p class="muted">补码金额：${formatAmount(state.topUpPrompt.amount)}</p>
         </div>
         <div class="prompt-actions">

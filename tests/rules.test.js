@@ -20,6 +20,7 @@ import {
 } from "../src/poker.js";
 import { buildRangeMatrix, getRecommendationForHand } from "../src/ranges.js";
 import { pickArchetypes } from "../src/tablePool.js";
+import { passiveSeatStatus, shouldPromptTopUp, TOP_UP_PROMPT_THRESHOLD } from "../src/tableRules.js";
 
 function card(rank, suit) {
   return { rank, suit };
@@ -37,7 +38,8 @@ function seat(overrides) {
     inHand: overrides.inHand ?? true,
     acted: overrides.acted ?? false,
     cards: overrides.cards ?? [card("7", "h"), card("2", "d")],
-    archetype: overrides.archetype ?? { key: "weak-tight" }
+    archetype: overrides.archetype ?? { key: "weak-tight" },
+    status: overrides.status ?? ""
   };
 }
 
@@ -189,6 +191,21 @@ describe("bot table pool", () => {
     expect(elites).toHaveLength(3);
     expect(deviated).toHaveLength(4);
     expect(Math.max(...deviatedCounts.values())).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("table UX rules", () => {
+  test("acted seats keep meaningful street status instead of reverting to waiting", () => {
+    expect(passiveSeatStatus(seat({ acted: true, betStreet: 0 }), 0)).toBe("已过牌");
+    expect(passiveSeatStatus(seat({ acted: true, betStreet: 60, status: "跟注" }), 60)).toBe("已跟注");
+    expect(passiveSeatStatus(seat({ acted: true, betStreet: 120, status: "加注" }), 120)).toBe("加注");
+    expect(passiveSeatStatus(seat({ acted: false, betStreet: 20 }), 60)).toBe("待跟注");
+  });
+
+  test("top-up prompt interrupts only when hero is bust or meaningfully short", () => {
+    expect(shouldPromptTopUp(STARTING_STACK - 49)).toBe(false);
+    expect(shouldPromptTopUp(TOP_UP_PROMPT_THRESHOLD)).toBe(true);
+    expect(shouldPromptTopUp(0)).toBe(true);
   });
 });
 
