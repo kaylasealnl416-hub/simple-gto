@@ -1346,7 +1346,8 @@ function renderRangeSheet(hero) {
             .map(
               (cell) => `
                 <button class="range-cell ${cell.colorClass} ${cell.hand === selected ? "active" : ""}" data-hand="${cell.hand}">
-                  ${cell.hand}
+                  <span class="hand">${cell.hand}</span>
+                  <span class="range-score">${cell.score}</span>
                   <span class="pct">${cell.pct}%</span>
                 </button>
               `
@@ -1354,7 +1355,7 @@ function renderRangeSheet(hero) {
             .join("")}
         </div>
         <div class="range-detail">
-          <strong>${detail.hand} · ${detail.pct}%</strong>
+          <strong>${detail.hand} · 评分 ${detail.score} · ${detail.pct}%</strong>
           <p>${detail.label}。当前面板只服务翻前实战，颜色规则固定：红=加注，蓝=跟注，灰=弃牌。</p>
         </div>
       </div>

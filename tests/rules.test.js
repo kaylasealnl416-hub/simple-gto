@@ -126,6 +126,8 @@ describe("preflop strategy helpers", () => {
     const matrix = buildRangeMatrix("BTN", "unopened");
     expect(matrix).toHaveLength(13);
     expect(matrix[0]).toHaveLength(13);
+    expect(matrix[0][0].score).toBeGreaterThanOrEqual(0);
+    expect(matrix[0][0].score).toBeLessThanOrEqual(100);
     expect(classifyHoleCards(card("A", "h"), card("K", "h"))).toBe("AKs");
   });
 

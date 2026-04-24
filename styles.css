@@ -628,7 +628,7 @@ button:disabled {
 .range-cell {
   border: 0;
   border-radius: 8px;
-  min-height: 30px;
+  min-height: 38px;
   padding: 4px 3px;
   font-size: 10px;
   line-height: 1.05;
@@ -659,9 +659,20 @@ button:disabled {
   box-shadow: 0 0 0 2px rgba(237, 245, 243, 0.5);
 }
 
+.range-cell .hand,
+.range-cell .range-score,
 .range-cell .pct {
   display: block;
+}
+
+.range-cell .range-score {
   margin-top: 2px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.range-cell .pct {
+  margin-top: 1px;
   color: rgba(255, 255, 255, 0.82);
 }
 
