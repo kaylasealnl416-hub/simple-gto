@@ -1,8 +1,6 @@
 import {
   ACTION_TIMERS,
   BIG_BLIND,
-  DEVIATED_ARCHETYPES,
-  ELITE_ARCHETYPES,
   HERO_SEAT_INDEX,
   INITIAL_TIME_BANK,
   POSITION_LABELS,
@@ -14,6 +12,7 @@ import {
 } from "./config.js";
 import { chooseBotAction, getBotDelayMs } from "./bots.js";
 import { buildRangeMatrix, getRecommendationForHand } from "./ranges.js";
+import { pickArchetypes } from "./tablePool.js";
 import {
   buildSidePots,
   cardLabel,
@@ -125,25 +124,6 @@ function clearAutoActions(seat) {
     checkFold: false,
     callAny: false
   };
-}
-
-function pickArchetypes() {
-  const elites = [...ELITE_ARCHETYPES]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3)
-    .map((archetype) => ({ ...archetype }));
-
-  const deviated = [];
-  const counts = new Map();
-  while (deviated.length < 4) {
-    const picked = DEVIATED_ARCHETYPES[Math.floor(Math.random() * DEVIATED_ARCHETYPES.length)];
-    const count = counts.get(picked.key) ?? 0;
-    if (count >= 2) continue;
-    counts.set(picked.key, count + 1);
-    deviated.push({ ...picked });
-  }
-
-  return [...elites, ...deviated].sort(() => Math.random() - 0.5);
 }
 
 function createSession() {

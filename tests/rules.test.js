@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { BIG_BLIND, POSITION_LABELS, SEAT_LAYOUT, STARTING_STACK } from "../src/config.js";
+import {
+  BIG_BLIND,
+  DEVIATED_ARCHETYPES,
+  ELITE_ARCHETYPES,
+  POSITION_LABELS,
+  SEAT_LAYOUT,
+  STARTING_STACK
+} from "../src/config.js";
 import { chooseBotAction } from "../src/bots.js";
 import {
   buildSidePots,
@@ -12,6 +19,7 @@ import {
   uncalledAmountForWinner
 } from "../src/poker.js";
 import { buildRangeMatrix, getRecommendationForHand } from "../src/ranges.js";
+import { pickArchetypes } from "../src/tablePool.js";
 
 function card(rank, suit) {
   return { rank, suit };
@@ -160,6 +168,25 @@ describe("bot legality", () => {
       bb
     );
     expect(action.type).toBe("check");
+  });
+});
+
+describe("bot table pool", () => {
+  test("single table has 3 elite bots and 4 deviated bots with max duplicate 2", () => {
+    const archetypes = pickArchetypes();
+    const eliteKeys = new Set(ELITE_ARCHETYPES.map((entry) => entry.key));
+    const deviatedKeys = new Set(DEVIATED_ARCHETYPES.map((entry) => entry.key));
+    const elites = archetypes.filter((entry) => eliteKeys.has(entry.key));
+    const deviated = archetypes.filter((entry) => deviatedKeys.has(entry.key));
+    const deviatedCounts = new Map();
+    deviated.forEach((entry) => {
+      deviatedCounts.set(entry.key, (deviatedCounts.get(entry.key) ?? 0) + 1);
+    });
+
+    expect(archetypes).toHaveLength(7);
+    expect(elites).toHaveLength(3);
+    expect(deviated).toHaveLength(4);
+    expect(Math.max(...deviatedCounts.values())).toBeLessThanOrEqual(2);
   });
 });
 
