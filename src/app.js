@@ -55,6 +55,7 @@ const state = {
   pauseNotice: null,
   topUpPrompt: null,
   selectedRangeHand: null,
+  confirmingAllIn: false,
   timerIntervalId: null,
   countdownIntervalId: null,
   botActionTimer: null,
@@ -177,6 +178,7 @@ function beginNewSession() {
   state.optionsOpen = false;
   state.reviewOpen = false;
   state.pauseNotice = null;
+  state.confirmingAllIn = false;
   state.topUpPrompt = null;
   state.selectedRangeHand = null;
   startNextHand();
@@ -204,6 +206,7 @@ function restoreSession(existing) {
   state.rangeOpen = false;
   state.optionsOpen = false;
   state.reviewOpen = Boolean(existing.sessionSummary);
+  state.confirmingAllIn = false;
   state.topUpPrompt = null;
   startSessionTimer();
   if (!state.reviewOpen && state.session.phase !== "playing") {
@@ -252,6 +255,7 @@ function endSession() {
   state.rangeOpen = false;
   state.optionsOpen = false;
   state.pauseNotice = null;
+  state.confirmingAllIn = false;
   state.topUpPrompt = null;
   state.reviewOpen = true;
   saveSession();
@@ -428,6 +432,7 @@ function markBetweenHands() {
   state.session.actorIndex = null;
   state.rangeOpen = false;
   state.optionsOpen = false;
+  state.confirmingAllIn = false;
   state.session.timer.secondsLeft = 0;
   state.session.timer.expiresAt = 0;
   state.session.timer.baseDeadline = 0;
@@ -667,6 +672,7 @@ function showdownOrder(seats) {
 
 function commitAction(seat, type, amount = 0) {
   if (!seat) return;
+  state.confirmingAllIn = false;
   if (state.botActionTimer) {
     clearTimeout(state.botActionTimer);
     state.botActionTimer = null;
@@ -1151,6 +1157,7 @@ function normalizeRaiseAmount(hero, amount) {
 
 function setSelectedRaiseAmount(amount) {
   const hero = getHeroSeat();
+  state.confirmingAllIn = false;
   hero.selectedRaiseAmount = normalizeRaiseAmount(hero, amount);
 }
 
@@ -1216,7 +1223,7 @@ function heroAvailableActions() {
         ? [
             {
               type: isAllInTarget ? "all-in" : unopened ? "bet" : "raise",
-              label: isAllInTarget ? "全下" : unopened ? "下注" : "加注",
+              label: isAllInTarget ? (state.confirmingAllIn ? "确认全下" : "全下") : unopened ? "下注" : "加注",
               detail: formatAmount(selected)
             }
           ]
@@ -1795,6 +1802,11 @@ function bindEvents() {
       if (state.session.actorIndex !== HERO_SEAT_INDEX) return;
       const action = button.dataset.playAction;
       if (action === "raise" || action === "bet" || action === "all-in") {
+        if (action === "all-in" && !state.confirmingAllIn) {
+          state.confirmingAllIn = true;
+          render();
+          return;
+        }
         const resolvedAction =
           action === "all-in" ? (state.session.currentBet === 0 ? "bet" : "raise") : action;
         commitAction(hero, resolvedAction, getSelectedRaiseAmount());
