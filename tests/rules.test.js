@@ -20,7 +20,7 @@ import {
 } from "../src/poker.js";
 import { buildRangeMatrix, getRecommendationForHand } from "../src/ranges.js";
 import { pickArchetypes } from "../src/tablePool.js";
-import { passiveSeatStatus, shouldPromptTopUp, TOP_UP_PROMPT_THRESHOLD } from "../src/tableRules.js";
+import { passiveSeatStatus, shouldPromptTopUp } from "../src/tableRules.js";
 
 function card(rank, suit) {
   return { rank, suit };
@@ -202,9 +202,9 @@ describe("table UX rules", () => {
     expect(passiveSeatStatus(seat({ acted: false, betStreet: 20 }), 60)).toBe("待跟注");
   });
 
-  test("top-up prompt interrupts only when hero is bust or meaningfully short", () => {
+  test("top-up prompt interrupts only when hero is bust", () => {
     expect(shouldPromptTopUp(STARTING_STACK - 49)).toBe(false);
-    expect(shouldPromptTopUp(TOP_UP_PROMPT_THRESHOLD)).toBe(true);
+    expect(shouldPromptTopUp(BIG_BLIND * 100)).toBe(false);
     expect(shouldPromptTopUp(0)).toBe(true);
   });
 });

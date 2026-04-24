@@ -1,7 +1,3 @@
-import { BIG_BLIND, STARTING_STACK } from "./config.js";
-
-export const TOP_UP_PROMPT_THRESHOLD = BIG_BLIND * 100;
-
 export function passiveSeatStatus(seat, currentBet) {
   if (seat.betStreet < currentBet) {
     return "待跟注";
@@ -22,5 +18,5 @@ export function passiveSeatStatus(seat, currentBet) {
 }
 
 export function shouldPromptTopUp(stack) {
-  return stack <= 0 || stack <= Math.min(TOP_UP_PROMPT_THRESHOLD, STARTING_STACK - BIG_BLIND);
+  return stack <= 0;
 }

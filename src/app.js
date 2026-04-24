@@ -356,6 +356,16 @@ function autoTopUpBots() {
   updateSeatResultLabels();
 }
 
+function autoTopUpHeroIfNeeded() {
+  const hero = getHeroSeat();
+  if (!hero || hero.stack <= 0 || hero.stack >= STARTING_STACK) return;
+  const topped = topUpSeatToMax(hero);
+  if (topped > 0) {
+    hero.status = "已自动补满";
+  }
+  updateSeatResultLabels();
+}
+
 function drawCard() {
   return state.session.deck.pop();
 }
@@ -936,6 +946,7 @@ function showdown() {
 
 function finishHand() {
   autoTopUpBots();
+  autoTopUpHeroIfNeeded();
   markBetweenHands();
   updateSeatResultLabels();
   saveSession();
