@@ -997,6 +997,12 @@ button:disabled {
   align-items: center;
 }
 
+.review-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .review-tag {
   display: inline-flex;
   padding: 4px 8px;

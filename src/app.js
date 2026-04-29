@@ -241,6 +241,9 @@ function endSession() {
         id: seat.id,
         name: seat.name,
         label: seat.archetype.label,
+        hands: seat.stats.hands,
+        vpipHands: seat.stats.vpipHands,
+        pfrHands: seat.stats.pfrHands,
         vpip: seat.stats.vpip,
         pfr: seat.stats.pfr,
         result: seatNetResult(seat)
@@ -1548,7 +1551,8 @@ function renderReviewCard() {
                 (bot) => `
                   <li class="review-item">
                     <strong>${bot.name}<span class="review-tag">${bot.label}</span></strong>
-                    <p>VPIP ${bot.vpip}% · PFR ${bot.pfr}% · 本场 ${bot.result >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(bot.result))}</p>
+                    <p>VPIP ${bot.vpip}% (${bot.vpipHands}/${bot.hands}) · PFR ${bot.pfr}% (${bot.pfrHands}/${bot.hands})</p>
+                    <p>本场 ${bot.result >= 0 ? "赢" : "输"} ${formatAmount(Math.abs(bot.result))}</p>
                   </li>
                 `
               )
@@ -1577,7 +1581,10 @@ function renderReviewCard() {
           </ul>
         </div>
         <div class="review-section">
-          <button class="home-cta" data-action="back-home">返回首页</button>
+          <div class="review-actions">
+            <button class="home-cta" data-action="restart-session">再开一局</button>
+            <button class="secondary-action" data-action="back-home">返回首页</button>
+          </div>
         </div>
       </div>
     </section>
