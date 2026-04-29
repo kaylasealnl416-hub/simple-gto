@@ -1375,17 +1375,12 @@ function renderSeat(seat) {
   const faceDown = !isHero && !revealCards;
   const actionClass = seatActionClass(seat);
   const statusText = seatStatusText(seat);
-  const betTag =
-    seat.betStreet > 0
-      ? `<div class="bet-tag ${actionClass}" style="top: calc(${style.top} + 82px); left: calc(${style.left} + 10px);">${formatAmount(seat.betStreet)}</div>`
-      : "";
   const dealer =
     seat.position === "BTN"
       ? `<div class="dealer-button" style="top: calc(${style.top} + 10px); left: calc(${style.left} - 16px);">D</div>`
       : "";
   return `
     ${dealer}
-    ${betTag}
     <div class="seat ${isHero ? "hero" : ""} ${actionClass} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
       style="top:${style.top}; left:${style.left};">
       <div class="label">${isHero ? "固定座位" : seat.name}</div>
@@ -1393,7 +1388,7 @@ function renderSeat(seat) {
       <div class="stack">${formatAmount(seat.stack)}</div>
       <div class="status ${actionClass}">${statusText}</div>
     </div>
-    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 18px); left: calc(${style.left} + 10px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
+    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 12px); left: calc(${style.left} + 8px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
   `;
 }
 
