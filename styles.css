@@ -232,6 +232,20 @@ button:disabled {
   font-size: 20px;
 }
 
+.pot-box small {
+  display: block;
+  width: max-content;
+  max-width: min(76vw, 360px);
+  margin: 6px auto 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 111, 103, 0.9);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .board {
   position: absolute;
   top: 168px;
@@ -256,10 +270,10 @@ button:disabled {
 
 .seat {
   position: absolute;
-  width: 106px;
-  min-height: 88px;
-  padding: 12px 10px;
-  border-radius: 18px;
+  width: 100px;
+  min-height: 82px;
+  padding: 10px 9px;
+  border-radius: 16px;
   background: rgba(27, 35, 33, 0.9);
   border: 1px solid rgba(119, 151, 144, 0.22);
   color: var(--text);
@@ -267,7 +281,7 @@ button:disabled {
 }
 
 .seat.hero {
-  width: 116px;
+  width: 108px;
   border-color: rgba(44, 205, 185, 0.65);
   box-shadow:
     0 0 0 1px rgba(44, 205, 185, 0.18),
@@ -284,30 +298,77 @@ button:disabled {
     0 0 26px rgba(44, 205, 185, 0.18);
 }
 
+.seat.action-bet {
+  border-color: rgba(255, 111, 103, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(255, 111, 103, 0.2),
+    0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
+.seat.action-call {
+  border-color: rgba(39, 145, 215, 0.58);
+}
+
+.seat.action-pending {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .seat .label {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .seat .position {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .seat .stack {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 5px;
+  font-size: 12px;
   color: var(--accent);
 }
 
 .seat .status {
+  display: inline-flex;
+  max-width: 100%;
   margin-top: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.seat .status.action-bet {
+  background: rgba(255, 111, 103, 0.92);
+  color: #fff;
+}
+
+.seat .status.action-call {
+  background: rgba(39, 145, 215, 0.86);
+  color: #fff;
+}
+
+.seat .status.action-pending {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-soft);
+}
+
+.seat .status.action-check {
+  color: var(--accent);
+}
+
+.seat .status.action-fold {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 245, 243, 0.62);
 }
 
 .dealer-button,
@@ -342,11 +403,31 @@ button:disabled {
 }
 
 .bet-tag {
-  min-width: 46px;
-  padding: 6px 10px;
+  z-index: 4;
+  min-width: 42px;
+  padding: 5px 9px;
   background: rgba(16, 23, 22, 0.84);
   color: var(--accent);
   border: 1px solid rgba(44, 205, 185, 0.24);
+  font-size: 10px;
+}
+
+.bet-tag.action-bet {
+  background: rgba(255, 111, 103, 0.92);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.bet-tag.action-call {
+  background: rgba(39, 145, 215, 0.88);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.bet-tag.action-pending {
+  background: rgba(16, 23, 22, 0.72);
+  color: var(--text-soft);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .hero-cards {
@@ -362,9 +443,9 @@ button:disabled {
 
 .playing-card {
   position: relative;
-  width: 68px;
-  height: 94px;
-  border-radius: 14px;
+  width: 58px;
+  height: 80px;
+  border-radius: 12px;
   background: #fff;
   color: var(--card-black);
   box-shadow: 0 18px 28px rgba(0, 0, 0, 0.28);
@@ -385,18 +466,47 @@ button:disabled {
 
 .playing-card .rank {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  font-size: 26px;
+  top: 8px;
+  left: 9px;
+  font-size: 23px;
   font-weight: 700;
 }
 
 .playing-card .suit {
   position: absolute;
-  bottom: 8px;
-  right: 10px;
-  font-size: 24px;
+  bottom: 7px;
+  right: 9px;
+  font-size: 21px;
   font-weight: 700;
+}
+
+.seat-cards .playing-card {
+  width: 48px;
+  height: 66px;
+  border-radius: 11px;
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.24);
+}
+
+.seat-cards .playing-card .rank {
+  top: 7px;
+  left: 7px;
+  font-size: 18px;
+}
+
+.seat-cards .playing-card .suit {
+  right: 7px;
+  bottom: 6px;
+  font-size: 16px;
+}
+
+.board .playing-card {
+  width: 54px;
+  height: 74px;
+}
+
+.hero-cards .playing-card {
+  width: 60px;
+  height: 84px;
 }
 
 .action-panel {

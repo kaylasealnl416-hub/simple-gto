@@ -1332,14 +1332,52 @@ function renderHome() {
   `;
 }
 
+function seatActionClass(seat) {
+  if (["下注", "加注", "再加注", "全下"].includes(seat.status)) return "action-bet";
+  if (["跟注", "已跟注"].includes(seat.status)) return "action-call";
+  if (seat.status === "待跟注") return "action-pending";
+  if (["弃牌"].includes(seat.status)) return "action-fold";
+  if (["过牌", "已过牌"].includes(seat.status)) return "action-check";
+  return "";
+}
+
+function seatStatusText(seat) {
+  const status = seat.status || "等待";
+  if (["下注", "加注", "全下"].includes(status) && seat.betStreet > 0) {
+    const verb = status === "下注" ? "下注" : status === "全下" ? "全下" : "加注到";
+    return `${verb} ${formatAmount(seat.betStreet)}`;
+  }
+  if (["跟注", "已跟注"].includes(status) && seat.betStreet > 0) {
+    return `跟注 ${formatAmount(seat.betStreet)}`;
+  }
+  if (status === "待跟注" && state.session.currentBet > seat.betStreet) {
+    return `需跟 ${formatAmount(state.session.currentBet - seat.betStreet)}`;
+  }
+  return status;
+}
+
+function seatActionSummary(seat) {
+  return `${seat.name} ${positionLabel(seat.position)} ${seatStatusText(seat)}`;
+}
+
+function currentActionBanner() {
+  if (state.session.raiseCount <= 0 && !state.session.streetAggressorId) return "";
+  const aggressor =
+    state.session.seats.find((seat) => seat.id === state.session.streetAggressorId) ||
+    state.session.seats.find((seat) => seat.id === state.session.preflopAggressorId);
+  return aggressor ? `最近动作：${seatActionSummary(aggressor)}` : "";
+}
+
 function renderSeat(seat) {
   const style = SEAT_LAYOUT[seat.seatIndex];
   const isHero = seat.seatIndex === HERO_SEAT_INDEX;
   const revealCards = state.session.revealedSeatIds?.includes(seat.id);
   const faceDown = !isHero && !revealCards;
+  const actionClass = seatActionClass(seat);
+  const statusText = seatStatusText(seat);
   const betTag =
     seat.betStreet > 0
-      ? `<div class="bet-tag" style="top: calc(${style.top} + 88px); left: calc(${style.left} + 12px);">${formatAmount(seat.betStreet)}</div>`
+      ? `<div class="bet-tag ${actionClass}" style="top: calc(${style.top} + 82px); left: calc(${style.left} + 10px);">${formatAmount(seat.betStreet)}</div>`
       : "";
   const dealer =
     seat.position === "BTN"
@@ -1348,14 +1386,14 @@ function renderSeat(seat) {
   return `
     ${dealer}
     ${betTag}
-    <div class="seat ${isHero ? "hero" : ""} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
+    <div class="seat ${isHero ? "hero" : ""} ${actionClass} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
       style="top:${style.top}; left:${style.left};">
       <div class="label">${isHero ? "固定座位" : seat.name}</div>
       <div class="position">${positionLabel(seat.position)}</div>
       <div class="stack">${formatAmount(seat.stack)}</div>
-      <div class="status">${seat.status || "等待"}</div>
+      <div class="status ${actionClass}">${statusText}</div>
     </div>
-    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 26px); left: calc(${style.left} + 12px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
+    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 18px); left: calc(${style.left} + 10px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
   `;
 }
 
@@ -1640,6 +1678,7 @@ function renderActionPanel(hero) {
 function renderTable() {
   const hero = getHeroSeat();
   const actor = state.session.actorIndex != null ? state.session.seats[state.session.actorIndex] : null;
+  const actionBanner = currentActionBanner();
   const sessionLeft = state.session.sessionEndingAfterHand
     ? "本手后结束"
     : formatSessionTime(state.session.endsAt - Date.now());
@@ -1667,7 +1706,10 @@ function renderTable() {
           </div>
         </section>
         <section class="table-stage">
-          <div class="pot-box"><strong>底池 ${formatAmount(state.session.pot)}</strong></div>
+          <div class="pot-box">
+            <strong>底池 ${formatAmount(state.session.pot)}</strong>
+            ${actionBanner ? `<small>${actionBanner}</small>` : ""}
+          </div>
           <div class="board">${state.session.board.map((card) => renderPlayingCard(card)).join("")}</div>
           <div class="seat-grid">
             ${state.session.seats.map((seat) => renderSeat(seat)).join("")}
