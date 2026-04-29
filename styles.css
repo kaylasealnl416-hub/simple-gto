@@ -565,13 +565,28 @@ button:disabled {
 }
 
 .quick-size {
+  display: grid;
+  gap: 3px;
   padding: 10px 8px;
   background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.quick-size small {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.15;
 }
 
 .quick-size.active {
   background: rgba(44, 205, 185, 0.14);
   color: var(--accent);
+}
+
+.quick-size.active small {
+  color: rgba(44, 205, 185, 0.78);
 }
 
 .action-row {

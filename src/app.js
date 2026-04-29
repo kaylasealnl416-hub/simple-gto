@@ -1113,18 +1113,20 @@ function getQuickSizes(hero) {
       .filter((size, index, list) => list.findIndex((entry) => Math.round(entry.amount) === Math.round(size.amount)) === index);
   }
 
-  const betBase = unopened ? state.session.pot : state.session.currentBet + state.session.pot * 0.5;
-  return [0.33, 0.5, 0.75, 1]
-    .map((pct) => {
-      const target = Math.min(
-        Math.max(
-          state.session.currentBet + BIG_BLIND,
-          Math.round((unopened ? state.session.pot : betBase) * pct + (unopened ? 0 : state.session.currentBet))
-        ),
-        maxTarget
-      );
+  const pot = Math.max(BIG_BLIND, state.session.pot);
+  return [
+    { label: "1/3池", pct: 1 / 3 },
+    { label: "1/2池", pct: 0.5 },
+    { label: "3/4池", pct: 0.75 },
+    { label: "满池", pct: 1 }
+  ]
+    .map((size) => {
+      const rawTarget = Math.round((unopened ? 0 : state.session.currentBet) + pot * size.pct);
+      const target = normalizeRaiseAmount(hero, rawTarget);
       return {
-        label: `${target} / ${(target / BIG_BLIND).toFixed(1).replace(/\.0$/, "")}BB`,
+        label: size.label,
+        detail: formatAmount(target),
+        potLabel: `底池 ${formatAmount(pot)}`,
         amount: target
       };
     })
@@ -1193,12 +1195,15 @@ function heroAvailableActions() {
   const { minTarget, maxTarget } = getRaiseBounds(hero);
   const isAllInTarget = Math.round(selected) >= Math.round(maxTarget);
   const raiseAvailable = canSeatRaise(hero);
+  const selectedQuickSize = quickSizes.find((size) => Math.round(size.amount) === Math.round(selected));
 
   return {
     available: true,
     canRaise: raiseAvailable,
     quickSizes,
     selectedAmount: selected,
+    selectedSizeLabel: selectedQuickSize?.label ?? "",
+    potLabel: state.session.street === "preflop" ? "" : `底池 ${formatAmount(state.session.pot)}`,
     minTarget,
     maxTarget,
     buttons: (toCall > 0
@@ -1638,8 +1643,8 @@ function renderActionPanel(hero) {
         ? `
       <div class="bet-tuner">
         <div class="bet-summary">
-          <span>目标下注</span>
-          <strong>${formatAmount(actionConfig.selectedAmount)}</strong>
+          <span>${actionConfig.potLabel ? `目标下注 · ${actionConfig.potLabel}` : "目标下注"}</span>
+          <strong>${actionConfig.selectedSizeLabel ? `${actionConfig.selectedSizeLabel} · ` : ""}${formatAmount(actionConfig.selectedAmount)}</strong>
           <small>最小 ${formatAmount(actionConfig.minTarget)} · 封顶 ${formatAmount(actionConfig.maxTarget)}</small>
         </div>
         <div class="bet-controls">
@@ -1654,7 +1659,8 @@ function renderActionPanel(hero) {
           .map(
             (size) => `
               <button class="quick-size ${Math.round(actionConfig.selectedAmount) === Math.round(size.amount) ? "active" : ""}" data-raise-amount="${size.amount}">
-                ${size.label}
+                <span>${size.label}</span>
+                ${size.detail ? `<small>${size.detail}</small>` : ""}
               </button>
             `
           )
