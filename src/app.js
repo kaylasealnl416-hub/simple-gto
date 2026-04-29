@@ -1376,6 +1376,7 @@ function renderSeat(seat) {
   const isHero = seat.seatIndex === HERO_SEAT_INDEX;
   const revealCards = state.session.revealedSeatIds?.includes(seat.id);
   const faceDown = !isHero && !revealCards;
+  const showOpponentCards = !isHero && (!seat.folded || revealCards);
   const actionClass = seatActionClass(seat);
   const statusText = seatStatusText(seat);
   const dealer =
@@ -1384,6 +1385,7 @@ function renderSeat(seat) {
       : "";
   return `
     ${dealer}
+    ${showOpponentCards ? `<div class="seat-cards" style="top: calc(${style.top} - 6px); left: calc(${style.left} + 10px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
     <div class="seat ${isHero ? "hero" : ""} ${actionClass} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
       style="top:${style.top}; left:${style.left};">
       <div class="label">${isHero ? "固定座位" : seat.name}</div>
@@ -1391,7 +1393,6 @@ function renderSeat(seat) {
       <div class="stack">${formatAmount(seat.stack)}</div>
       <div class="status ${actionClass}">${statusText}</div>
     </div>
-    ${!isHero ? `<div class="seat-cards" style="top: calc(${style.top} - 12px); left: calc(${style.left} + 8px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
   `;
 }
 
@@ -1710,7 +1711,6 @@ function renderTable() {
         <section class="table-stage">
           <div class="pot-box">
             <strong>底池 ${formatAmount(state.session.pot)}</strong>
-            ${actionBanner ? `<small>${actionBanner}</small>` : ""}
           </div>
           <div class="board">${state.session.board.map((card) => renderPlayingCard(card)).join("")}</div>
           <div class="seat-grid">
@@ -1728,6 +1728,7 @@ function renderTable() {
             ${hero.cards.map((card) => renderPlayingCard(card)).join("")}
           </div>
         </section>
+        ${actionBanner ? `<div class="action-banner">${actionBanner}</div>` : ""}
         ${renderActionPanel(hero)}
         <section class="bottom-nav">
           <button class="pill-button ${state.rangeOpen ? "active" : ""}" data-action="open-range" ${canUsePreflopRange() ? "" : "disabled"}>策略</button>

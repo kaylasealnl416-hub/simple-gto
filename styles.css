@@ -232,20 +232,6 @@ button:disabled {
   font-size: 20px;
 }
 
-.pot-box small {
-  display: block;
-  width: max-content;
-  max-width: min(76vw, 360px);
-  margin: 6px auto 0;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(255, 111, 103, 0.9);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .board {
   position: absolute;
   top: 168px;
@@ -264,14 +250,16 @@ button:disabled {
 
 .seat-cards {
   position: absolute;
+  z-index: 1;
   display: flex;
-  gap: 4px;
-  opacity: 0.82;
+  gap: 3px;
+  opacity: 0.46;
   pointer-events: none;
 }
 
 .seat {
   position: absolute;
+  z-index: 2;
   width: 100px;
   min-height: 82px;
   padding: 10px 9px;
@@ -483,22 +471,22 @@ button:disabled {
 }
 
 .seat-cards .playing-card {
-  width: 36px;
-  height: 50px;
-  border-radius: 8px;
-  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.2);
+  width: 29px;
+  height: 40px;
+  border-radius: 7px;
+  box-shadow: 0 7px 12px rgba(0, 0, 0, 0.18);
 }
 
 .seat-cards .playing-card .rank {
-  top: 5px;
-  left: 5px;
-  font-size: 14px;
+  top: 4px;
+  left: 4px;
+  font-size: 11px;
 }
 
 .seat-cards .playing-card .suit {
-  right: 5px;
-  bottom: 4px;
-  font-size: 12px;
+  right: 4px;
+  bottom: 3px;
+  font-size: 10px;
 }
 
 .board .playing-card {
@@ -514,6 +502,18 @@ button:disabled {
 .action-panel {
   display: grid;
   gap: 10px;
+}
+
+.action-banner {
+  margin-top: -6px;
+  padding: 9px 12px;
+  border-radius: 18px;
+  background: rgba(255, 111, 103, 0.13);
+  border: 1px solid rgba(255, 111, 103, 0.26);
+  color: #ffcbc6;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .bet-tuner {
