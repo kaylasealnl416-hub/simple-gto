@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  ACTION_TIMERS,
   BIG_BLIND,
   DEVIATED_ARCHETYPES,
   ELITE_ARCHETYPES,
@@ -215,5 +216,11 @@ describe("table constants", () => {
     expect(POSITION_LABELS).toHaveLength(8);
     expect(BIG_BLIND).toBe(20);
     expect(STARTING_STACK).toBe(4000);
+  });
+
+  test("action timers include the extra 30 seconds for UAT thinking time", () => {
+    expect(ACTION_TIMERS.preflopUnopened).toBe(40);
+    expect(ACTION_TIMERS.preflopFacingRaise).toBe(45);
+    expect(ACTION_TIMERS.postflop).toBe(45);
   });
 });

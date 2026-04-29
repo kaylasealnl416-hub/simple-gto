@@ -24,9 +24,9 @@ export const SEAT_LAYOUT = [
 ];
 
 export const ACTION_TIMERS = {
-  preflopUnopened: 10,
-  preflopFacingRaise: 15,
-  postflop: 15
+  preflopUnopened: 40,
+  preflopFacingRaise: 45,
+  postflop: 45
 };
 
 export const INITIAL_TIME_BANK = 15;
