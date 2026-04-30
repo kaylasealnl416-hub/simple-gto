@@ -41,7 +41,7 @@ bun run serve
 
 ## 桌面一键打开
 
-本机桌面快捷方式 `简单GTO` 会打开 `scripts/launch-local.ps1`，直接用浏览器加载本地 `index.html#autostart` 并进入实战，不依赖本地端口或外网。
+本机桌面快捷方式 `简单GTO` 会打开 `scripts/launch-local.ps1`，先拉起本地预览服务，再用浏览器打开 `http://localhost:4173/#autostart` 并进入实战。
 
 ## 手机使用路径
 
