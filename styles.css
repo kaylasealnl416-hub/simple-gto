@@ -516,6 +516,18 @@ button:disabled {
   height: 78px;
 }
 
+@media (min-width: 900px) {
+  .hero-cards {
+    left: calc(29% + 54px);
+    bottom: 122px;
+  }
+
+  .strategy-trigger {
+    right: calc(71% - 42px);
+    bottom: 124px;
+  }
+}
+
 .action-panel {
   display: grid;
   gap: 8px;
