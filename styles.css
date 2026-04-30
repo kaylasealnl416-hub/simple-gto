@@ -29,7 +29,10 @@
 html,
 body {
   margin: 0;
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   background: radial-gradient(circle at top, #1b2624 0%, var(--bg) 56%);
   color: var(--text);
   font-family:
@@ -39,7 +42,16 @@ body {
     sans-serif;
 }
 
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: radial-gradient(circle at top, #1b2624 0%, var(--bg) 56%);
+  overflow: hidden;
+}
+
 body {
+  background-color: var(--bg);
+  overflow: hidden;
   overscroll-behavior: none;
 }
 
@@ -54,8 +66,11 @@ button:disabled {
 }
 
 .app-shell {
-  min-height: 100vh;
-  padding: 18px 18px var(--safe-bottom);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 18px 12px;
 }
 
 .home-screen {
@@ -131,10 +146,12 @@ button:disabled {
 
 .table-screen {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  gap: 14px;
-  min-height: calc(100vh - var(--safe-bottom));
-  padding-bottom: 96px;
+  grid-template-rows: auto auto minmax(300px, 1fr) auto auto;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
 }
 
 .topbar,
@@ -151,7 +168,7 @@ button:disabled {
 
 .topbar {
   border-radius: 24px;
-  padding: 16px;
+  padding: 12px 14px;
 }
 
 .topbar-row,
@@ -165,7 +182,7 @@ button:disabled {
 }
 
 .topbar-title {
-  font-size: 24px;
+  font-size: 23px;
   font-weight: 700;
 }
 
@@ -178,14 +195,14 @@ button:disabled {
 
 .subbar {
   border-radius: 22px;
-  padding: 12px 14px;
+  padding: 8px 12px;
 }
 
 .subbar-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-soft);
@@ -198,14 +215,14 @@ button:disabled {
 
 .table-stage {
   position: relative;
-  min-height: 540px;
-  padding: 14px 0 10px;
+  min-height: 0;
+  padding: 8px 0 6px;
 }
 
 .table-stage::before {
   content: "";
   position: absolute;
-  inset: 12px 20px 12px;
+  inset: 8px 20px 8px;
   border-radius: 50% / 28%;
   background:
     radial-gradient(circle at 50% 40%, rgba(39, 205, 185, 0.18), transparent 32%),
@@ -218,7 +235,7 @@ button:disabled {
 
 .pot-box {
   position: absolute;
-  inset: 124px 0 auto;
+  inset: 104px 0 auto;
   z-index: 2;
   text-align: center;
   pointer-events: none;
@@ -234,7 +251,7 @@ button:disabled {
 
 .board {
   position: absolute;
-  top: 168px;
+  top: 142px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
@@ -380,7 +397,7 @@ button:disabled {
 }
 
 .strategy-trigger {
-  bottom: 128px;
+  bottom: 96px;
   right: 22px;
   z-index: 6;
   width: 38px;
@@ -422,7 +439,7 @@ button:disabled {
 
 .hero-cards {
   position: absolute;
-  bottom: 108px;
+  bottom: 78px;
   left: 50%;
   z-index: 3;
   transform: translateX(-50%);
@@ -501,12 +518,12 @@ button:disabled {
 
 .action-panel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .action-banner {
-  margin-top: -6px;
-  padding: 9px 12px;
+  margin-top: -2px;
+  padding: 7px 10px;
   border-radius: 18px;
   background: rgba(255, 111, 103, 0.13);
   border: 1px solid rgba(255, 111, 103, 0.26);
@@ -518,8 +535,10 @@ button:disabled {
 
 .bet-tuner {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
   border-radius: 22px;
   background: rgba(22, 30, 28, 0.92);
   border: 1px solid rgba(83, 110, 104, 0.26);
@@ -536,7 +555,7 @@ button:disabled {
 }
 
 .bet-summary strong {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .bet-controls {
@@ -546,7 +565,7 @@ button:disabled {
 }
 
 .bet-step {
-  min-height: 44px;
+  min-height: 40px;
   border: 0;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.08);
@@ -561,13 +580,13 @@ button:disabled {
 .quick-sizes {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .quick-size {
   display: grid;
   gap: 3px;
-  padding: 10px 8px;
+  padding: 8px 6px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
   font-weight: 700;
@@ -592,7 +611,7 @@ button:disabled {
 .action-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .action-row.two-actions {
@@ -602,11 +621,11 @@ button:disabled {
 .preaction-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .preaction-chip {
-  min-height: 46px;
+  min-height: 40px;
   border: 0;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.06);
@@ -620,8 +639,8 @@ button:disabled {
 }
 
 .action-chip {
-  min-height: 62px;
-  padding: 12px 10px;
+  min-height: 54px;
+  padding: 10px 8px;
   background: var(--fold);
   font-weight: 700;
 }
@@ -661,24 +680,22 @@ button:disabled {
 }
 
 .bottom-nav {
-  position: fixed;
-  left: 50%;
-  bottom: var(--safe-bottom);
+  position: static;
   z-index: 25;
-  width: min(calc(100vw - 36px), 484px);
+  width: 100%;
   min-width: 0;
-  transform: translateX(-50%);
+  transform: none;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   border-radius: 22px;
-  padding: 12px;
+  padding: 10px;
   backdrop-filter: blur(10px);
 }
 
 .pill-button {
   min-width: 0;
-  padding: 14px 12px;
+  padding: 12px 12px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
   font-weight: 700;
@@ -1036,13 +1053,47 @@ button:disabled {
 }
 
 @media (max-height: 820px) {
+  .table-screen {
+    grid-template-rows: auto auto minmax(260px, 1fr) auto auto;
+    gap: 7px;
+  }
+
+  .topbar-meta {
+    font-size: 12px;
+  }
+
   .table-stage {
-    min-height: 500px;
+    min-height: 0;
   }
 
   .seat {
     width: 96px;
-    min-height: 82px;
+    min-height: 76px;
+    padding: 8px;
+  }
+
+  .seat .position {
+    font-size: 15px;
+  }
+
+  .seat .stack {
+    margin-top: 3px;
+  }
+
+  .pot-box {
+    inset: 88px 0 auto;
+  }
+
+  .board {
+    top: 124px;
+  }
+
+  .hero-cards {
+    bottom: 66px;
+  }
+
+  .strategy-trigger {
+    bottom: 82px;
   }
 }
 
