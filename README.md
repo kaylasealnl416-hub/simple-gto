@@ -39,6 +39,10 @@ bun run serve
 
 如果 Windows 当前网络栈报“无法加载或初始化请求的服务提供程序”，这是本机网络服务问题，不代表 App 代码坏了。
 
+## 桌面一键打开
+
+本机桌面快捷方式 `简单GTO` 会打开 `scripts/launch-local.ps1`，直接用浏览器加载本地 `index.html#autostart` 并进入实战，不依赖本地端口或外网。
+
 ## 手机使用路径
 
 最简单试打路径：先在电脑运行 `bun run serve`，手机和电脑连同一个 Wi-Fi，用脚本输出的局域网地址打开。
