@@ -36,6 +36,7 @@ import {
   rakeablePotAmount,
   uncalledAmountForWinner
 } from "./poker.js";
+import { isValidSessionSnapshot, readJsonStorage, writeJsonStorage } from "./storageGuard.js";
 
 const STORAGE_KEY = "simple-gto-v1-session";
 const RAKE_PERCENT = 0.05;
@@ -69,7 +70,8 @@ const state = {
   countdownIntervalId: null,
   botActionTimer: null,
   streetRunoutTimer: null,
-  heroLongTermProfile: createHeroProfile()
+  heroLongTermProfile: createHeroProfile(),
+  startupNotice: null
 };
 
 function saveSession() {
@@ -77,29 +79,39 @@ function saveSession() {
     localStorage.removeItem(STORAGE_KEY);
     return;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.session));
+  const result = writeJsonStorage(localStorage, STORAGE_KEY, state.session);
+  if (!result.ok) {
+    state.startupNotice = "本地存档写入失败，本局仍可继续打；如果重开浏览器后不能恢复，请直接重新开始。";
+  }
 }
 
 function loadSession() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
+  const result = readJsonStorage(localStorage, STORAGE_KEY, {
+    fallback: null,
+    validate: isValidSessionSnapshot
+  });
+  if (result.status === "recovered") {
+    state.startupNotice = "检测到上次牌桌存档异常，已自动隔离旧存档并恢复到可启动状态。";
   }
+  return result.value;
 }
 
 function loadHeroLongTermProfile() {
-  try {
-    const raw = localStorage.getItem(HERO_PROFILE_STORAGE_KEY);
-    return normalizeHeroProfile(raw ? JSON.parse(raw) : null);
-  } catch {
-    return createHeroProfile();
+  const result = readJsonStorage(localStorage, HERO_PROFILE_STORAGE_KEY, {
+    fallback: createHeroProfile(),
+    validate: (value) => value && typeof value === "object"
+  });
+  if (result.status === "recovered") {
+    state.startupNotice = "AI 长期记忆数据异常，已自动重置，不影响继续打牌。";
   }
+  return normalizeHeroProfile(result.value);
 }
 
 function saveHeroLongTermProfile() {
-  localStorage.setItem(HERO_PROFILE_STORAGE_KEY, JSON.stringify(state.heroLongTermProfile));
+  const result = writeJsonStorage(localStorage, HERO_PROFILE_STORAGE_KEY, state.heroLongTermProfile);
+  if (!result.ok) {
+    state.startupNotice = "AI 长期记忆暂时无法写入，本局可以继续打牌。";
+  }
 }
 
 function createSeat(id, seatIndex) {
@@ -1460,6 +1472,10 @@ function formatSessionTime(ms) {
   return `${minutes}:${seconds}`;
 }
 
+function renderSystemNotice() {
+  return state.startupNotice ? `<div class="system-notice">${state.startupNotice}</div>` : "";
+}
+
 function compactCardText(cards) {
   if (!cards?.length) return "无";
   return cards.map((card) => cardLabel(card)).join(" ");
@@ -1483,6 +1499,7 @@ function renderHome() {
   return `
     <div class="app-shell">
       <div class="home-screen">
+        ${renderSystemNotice()}
         <section class="hero-card">
           <h1>简单GTO</h1>
           <p>只做一件事：让你在手机上打开就能进入 8 人现金局，对着更像真人强手的桌风持续实战。</p>
@@ -1882,6 +1899,7 @@ function renderTable() {
   return `
     <div class="app-shell">
       <div class="table-screen">
+        ${renderSystemNotice()}
         <section class="topbar">
           <div class="topbar-row">
             <div>
@@ -2104,17 +2122,48 @@ function registerServiceWorker() {
   }
 }
 
-function boot() {
-  state.heroLongTermProfile = loadHeroLongTermProfile();
-  const existing = loadSession();
-  registerServiceWorker();
-  render();
-  if (window.location.hash.includes("autostart")) {
-    beginNewSession();
-    return;
+function renderFatalRecovery(error) {
+  clearTimers();
+  state.session = null;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // If storage is unavailable, still render the recovery screen.
   }
-  if (existing) {
-    app.querySelector("[data-action='continue-session']")?.classList.remove("hidden");
+  const detail = error?.message ? `错误信息：${error.message}` : "错误信息：未知启动错误";
+  app.innerHTML = `
+    <div class="app-shell">
+      <div class="home-screen">
+        <section class="hero-card">
+          <h1>简单GTO</h1>
+          <p>启动时检测到异常，已清理当前牌桌存档。AI 长期记忆不会被删除。</p>
+          <p class="muted">${detail}</p>
+        </section>
+        <button class="home-cta" data-action="safe-restart">重新开始实战</button>
+      </div>
+    </div>
+  `;
+  app.querySelector("[data-action='safe-restart']")?.addEventListener("click", () => {
+    window.location.hash = "autostart";
+    window.location.reload();
+  });
+}
+
+function boot() {
+  try {
+    state.heroLongTermProfile = loadHeroLongTermProfile();
+    const existing = loadSession();
+    registerServiceWorker();
+    render();
+    if (window.location.hash.includes("autostart")) {
+      beginNewSession();
+      return;
+    }
+    if (existing) {
+      app.querySelector("[data-action='continue-session']")?.classList.remove("hidden");
+    }
+  } catch (error) {
+    renderFatalRecovery(error);
   }
 }
 

@@ -29,10 +29,32 @@ function Test-LocalPort {
   }
 }
 
+function Test-AppReady {
+  param([string]$Url)
+  try {
+    $request = [System.Net.WebRequest]::Create($Url)
+    $request.Timeout = 800
+    $response = $request.GetResponse()
+    $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+    $body = $reader.ReadToEnd()
+    $reader.Close()
+    $response.Close()
+    return $body -match "简单GTO"
+  } catch {
+    return $false
+  }
+}
+
 $env:SystemRoot = "C:\WINDOWS"
 $env:PORT = "$port"
 
-if (!(Test-LocalPort -Port $port)) {
+if ((Test-LocalPort -Port $port) -and !(Test-AppReady -Url "http://127.0.0.1:$port/")) {
+  Add-Type -AssemblyName PresentationFramework
+  [System.Windows.MessageBox]::Show("端口 $port 已被其他程序占用。请关闭占用程序后再打开简单GTO。", "简单GTO 启动失败", "OK", "Error") | Out-Null
+  exit 1
+}
+
+if (!(Test-AppReady -Url "http://127.0.0.1:$port/")) {
   Start-Process `
     -FilePath $bun `
     -ArgumentList @("run", "serve") `
@@ -44,7 +66,7 @@ if (!(Test-LocalPort -Port $port)) {
   $ready = $false
   for ($i = 0; $i -lt 20; $i += 1) {
     Start-Sleep -Milliseconds 250
-    if (Test-LocalPort -Port $port) {
+    if (Test-AppReady -Url "http://127.0.0.1:$port/") {
       $ready = $true
       break
     }

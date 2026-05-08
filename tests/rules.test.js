@@ -24,6 +24,7 @@ import {
 import { buildRangeMatrix, getRecommendationForHand } from "../src/ranges.js";
 import { pickArchetypes } from "../src/tablePool.js";
 import { passiveSeatStatus, shouldPromptTopUp } from "../src/tableRules.js";
+import { isValidSessionSnapshot, readJsonStorage, writeJsonStorage } from "../src/storageGuard.js";
 
 function card(rank, suit) {
   return { rank, suit };
@@ -43,6 +44,16 @@ function seat(overrides) {
     cards: overrides.cards ?? [card("7", "h"), card("2", "d")],
     archetype: overrides.archetype ?? { key: "weak-tight" },
     status: overrides.status ?? ""
+  };
+}
+
+function memoryStorage(initial = {}) {
+  const data = new Map(Object.entries(initial));
+  return {
+    getItem: (key) => (data.has(key) ? data.get(key) : null),
+    setItem: (key, value) => data.set(key, String(value)),
+    removeItem: (key) => data.delete(key),
+    keys: () => [...data.keys()]
   };
 }
 
@@ -298,6 +309,36 @@ describe("table UX rules", () => {
     expect(shouldPromptTopUp(STARTING_STACK - 49)).toBe(false);
     expect(shouldPromptTopUp(BIG_BLIND * 100)).toBe(false);
     expect(shouldPromptTopUp(0)).toBe(true);
+  });
+});
+
+describe("startup protection", () => {
+  test("invalid saved session is isolated and removed", () => {
+    const storage = memoryStorage({ session: "{bad json" });
+    const result = readJsonStorage(storage, "session", {
+      fallback: null,
+      validate: isValidSessionSnapshot
+    });
+    expect(result.status).toBe("recovered");
+    expect(result.value).toBe(null);
+    expect(storage.getItem("session")).toBe(null);
+    expect(storage.keys().some((key) => key.startsWith("session.corrupt."))).toBe(true);
+  });
+
+  test("valid saved session passes startup validation", () => {
+    const snapshot = {
+      seats: Array.from({ length: 8 }, (_, index) => ({ id: index })),
+      handNumber: 3,
+      phase: "playing"
+    };
+    const storage = memoryStorage();
+    expect(writeJsonStorage(storage, "session", snapshot).ok).toBe(true);
+    const result = readJsonStorage(storage, "session", {
+      fallback: null,
+      validate: isValidSessionSnapshot
+    });
+    expect(result.status).toBe("ok");
+    expect(result.value.handNumber).toBe(3);
   });
 });
 
