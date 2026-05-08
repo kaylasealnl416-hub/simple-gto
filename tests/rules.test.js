@@ -8,7 +8,7 @@ import {
   SEAT_LAYOUT,
   STARTING_STACK
 } from "../src/config.js";
-import { buildEffectiveBehavior, chooseBotAction } from "../src/bots.js";
+import { buildEffectiveBehavior, chooseBotAction, priorAggressiveStreets } from "../src/bots.js";
 import { buildHeroProfileReport, createHeroProfile, markHeroHand, recordHeroAction } from "../src/heroProfile.js";
 import { analyzeBoardTexture, analyzeDraws, analyzePostflopSituation } from "../src/postflopAnalysis.js";
 import {
@@ -218,6 +218,22 @@ describe("bot table pool", () => {
     expect(adjusted.steal).toBeGreaterThan(base.steal);
     expect(adjusted.cbet).toBeGreaterThan(base.cbet);
     expect(adjusted.openShift).toBeLessThan(base.openShift);
+  });
+
+  test("bot reads prior postflop aggression as a betting line", () => {
+    const streets = priorAggressiveStreets(
+      {
+        street: "river",
+        actionLog: [
+          { street: "preflop", seatId: "reg", type: "raise" },
+          { street: "flop", seatId: "reg", type: "bet" },
+          { street: "turn", seatId: "reg", type: "bet" },
+          { street: "turn", seatId: "caller", type: "call" }
+        ]
+      },
+      "reg"
+    );
+    expect(streets).toEqual(["flop", "turn"]);
   });
 });
 

@@ -23,6 +23,28 @@ function clampProbability(value) {
   return clamp(value, 0.02, 0.95);
 }
 
+const STREET_ORDER = ["preflop", "flop", "turn", "river"];
+
+export function priorAggressiveStreets(state, seatId) {
+  const currentIndex = STREET_ORDER.indexOf(state.street);
+  if (currentIndex <= 0 || !Array.isArray(state.actionLog)) {
+    return [];
+  }
+  const streets = new Set();
+  state.actionLog.forEach((entry) => {
+    const entryIndex = STREET_ORDER.indexOf(entry.street);
+    if (
+      entry.seatId === seatId &&
+      entryIndex > 0 &&
+      entryIndex < currentIndex &&
+      ["bet", "raise"].includes(entry.type)
+    ) {
+      streets.add(entry.street);
+    }
+  });
+  return STREET_ORDER.filter((street) => streets.has(street));
+}
+
 function regularAdjustmentScale(seat) {
   if (seat.archetype.key.includes("pressure")) return 1.25;
   if (seat.archetype.key.includes("balanced")) return 0.8;
@@ -247,10 +269,23 @@ function decidePostflop(state, seat) {
   const boardLength = state.board.length;
   const players = playerCount(state);
   const isPreflopAggressor = state.preflopAggressorId === seat.id;
+  const priorAggression = priorAggressiveStreets(state, seat.id);
+  const hasPriorPostflopAggression = priorAggression.length > 0;
+  const hasDoubleBarrelLine = priorAggression.includes("flop") && priorAggression.includes("turn");
+  const hasInitiative = isPreflopAggressor || hasPriorPostflopAggression;
+  const linePressureBonus = isRegular(seat)
+    ? hasDoubleBarrelLine
+      ? 12
+      : hasPriorPostflopAggression
+        ? 7
+        : 0
+    : hasPriorPostflopAggression
+      ? 3
+      : 0;
   const pressureMode = behavior.aggression > 0.62 || behavior.bluff > 0.24 || postflop.semiBluffReady;
   const topPairish = estimatePairStrength(seat, state.board);
   const raiseAvailable = canSeatRaise(state, seat);
-  const valueBetThreshold = 94 - behavior.thinValueShift;
+  const valueBetThreshold = 94 - behavior.thinValueShift - Math.round(linePressureBonus / 2);
   const callPenalty = potOddsPenalty(toCall, state.pot);
   const heroStillIn = state.seats[HERO_SEAT_INDEX]?.inHand && !state.seats[HERO_SEAT_INDEX]?.folded;
   const dryAggressorBoard = postflop.texture.cbetAdvantage === "preflop-aggressor";
@@ -264,6 +299,7 @@ function decidePostflop(state, seat) {
   const barrelThreshold =
     50 -
     behavior.foldPressureShift -
+    linePressureBonus -
     (postflop.semiBluffReady ? 12 : 0) +
     (postflop.texture.label === "wet" && !postflop.semiBluffReady ? 8 : 0);
 
@@ -274,7 +310,7 @@ function decidePostflop(state, seat) {
     if (isPreflopAggressor && boardLength === 3 && players <= 3 && Math.random() < cbetFrequency) {
       return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode && topPairish) };
     }
-    if (isPreflopAggressor && boardLength > 3 && heroStillIn && Math.random() < behavior.barrel && score >= barrelThreshold) {
+    if (hasInitiative && boardLength > 3 && heroStillIn && Math.random() < behavior.barrel && score >= barrelThreshold) {
       return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode || drawPressure >= 10) };
     }
     if (score >= 72 && Math.random() < behavior.aggression) {
@@ -301,7 +337,7 @@ function decidePostflop(state, seat) {
   }
 
   if (
-    score >= 76 + callPenalty ||
+    score >= 76 + callPenalty - Math.round(linePressureBonus / 2) ||
     (postflop.semiBluffReady && score >= 62 + callPenalty && Math.random() < behavior.showdownCurious + 0.16) ||
     (topPairish && score >= 58 + callPenalty && Math.random() < behavior.showdownCurious)
   ) {

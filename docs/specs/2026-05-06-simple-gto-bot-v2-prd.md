@@ -302,3 +302,19 @@ Bot V2 视为可验收，需要满足：
 
 - `bun test`：20 pass / 0 fail。
 - `bun build ./src/app.js --target=browser --outdir=.tmp-bun-build`：通过。
+
+## 17. V2.2 多街下注线实施记录
+
+状态：已实施。
+
+本批次覆盖：
+
+- 每手牌记录场内 action log，仅用于当前手牌策略判断。
+- bot 能读取自己在 flop / turn 的下注或加注记录。
+- regular 连续开火后，在 turn / river 更倾向延续合理 barrel 线。
+- 曾经主动下注的 bot 面对后续压力时，会把上一街主动权纳入继续/放弃判断。
+
+验证：
+
+- `bun test`：21 pass / 0 fail。
+- `bun build ./src/app.js --target=browser --outdir=.tmp-bun-build`：通过。

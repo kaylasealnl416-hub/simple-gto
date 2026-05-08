@@ -184,6 +184,7 @@ function createSession() {
     preflopAggressorId: null,
     streetAggressorId: null,
     actorIndex: null,
+    actionLog: [],
     handHistory: [],
     pendingMistake: null,
     lastMistake: null,
@@ -231,6 +232,9 @@ function restoreSession(existing) {
   });
   if (!Array.isArray(state.session.revealedSeatIds)) {
     state.session.revealedSeatIds = [];
+  }
+  if (!Array.isArray(state.session.actionLog)) {
+    state.session.actionLog = [];
   }
   if (!state.session.lastMistake) {
     state.session.lastMistake = state.session.pendingMistake ?? null;
@@ -439,6 +443,7 @@ function resetForHand() {
   state.session.raiseCount = 0;
   state.session.preflopAggressorId = null;
   state.session.streetAggressorId = null;
+  state.session.actionLog = [];
   state.session.revealedSeatIds = [];
   state.session.handNumber += 1;
   state.session.dealerIndex = (state.session.dealerIndex + 1) % 8;
@@ -717,6 +722,23 @@ function recordHandHistory(entry) {
   state.session.handHistory = state.session.handHistory.slice(0, 18);
 }
 
+function recordActionLog(seat, type, previousBet, toCall) {
+  state.session.actionLog.push({
+    handNumber: state.session.handNumber,
+    street: state.session.street,
+    boardLength: state.session.board.length,
+    seatId: seat.id,
+    position: seat.position,
+    type,
+    betStreet: seat.betStreet,
+    committed: seat.committed,
+    previousBet,
+    toCall,
+    at: Date.now()
+  });
+  state.session.actionLog = state.session.actionLog.slice(-80);
+}
+
 function distributeRake(totalPot) {
   if (state.session.board.length === 0) {
     state.session.lastRake = 0;
@@ -876,6 +898,8 @@ function commitAction(seat, type, amount = 0) {
       });
     }
   }
+
+  recordActionLog(seat, type, previousBet, toCall);
 
   if (isPreflop && ["call", "raise", "bet"].includes(type) && !seat.handFlags.vpipMarked) {
     seat.stats.vpipHands += 1;
