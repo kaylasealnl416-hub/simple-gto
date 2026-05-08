@@ -1,4 +1,6 @@
-import { ARCHETYPE_BEHAVIOR, BIG_BLIND } from "./config.js";
+import { ARCHETYPE_BEHAVIOR, BIG_BLIND, HERO_SEAT_INDEX } from "./config.js";
+import { normalizeHeroProfile, profileRate } from "./heroProfile.js";
+import { analyzePostflopSituation } from "./postflopAnalysis.js";
 import { evaluateSeven, handCategory, holeCardStrength } from "./poker.js";
 
 function rand(min, max) {
@@ -9,8 +11,77 @@ function getBehavior(seat) {
   return ARCHETYPE_BEHAVIOR[seat.archetype.key];
 }
 
+function isRegular(seat) {
+  return seat.archetype?.pool === "regular" || seat.archetype?.key?.startsWith("regular-") || seat.archetype?.key?.startsWith("elite-");
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function clampProbability(value) {
+  return clamp(value, 0.02, 0.95);
+}
+
+function regularAdjustmentScale(seat) {
+  if (seat.archetype.key.includes("pressure")) return 1.25;
+  if (seat.archetype.key.includes("balanced")) return 0.8;
+  return 1;
+}
+
+export function buildEffectiveBehavior(state, seat) {
+  const base = getBehavior(seat);
+  const behavior = {
+    ...base,
+    sizing: [...base.sizing],
+    delay: [...base.delay],
+    thinValueShift: 0,
+    foldPressureShift: 0
+  };
+  if (!isRegular(seat)) {
+    return behavior;
+  }
+
+  const profile = normalizeHeroProfile(state.heroLongTermProfile?.hands >= 10 ? state.heroLongTermProfile : state.heroProfile);
+  const scale = regularAdjustmentScale(seat);
+  const vpip = profileRate(profile.vpipHands, profile.hands);
+  const pfr = profileRate(profile.pfrHands, profile.hands);
+  const foldToSteal = profileRate(profile.foldToStealHands, profile.stealFaced);
+  const foldToThreeBet = profileRate(profile.foldToThreeBetHands, profile.threeBetFaced);
+  const foldToCbet = profileRate(profile.foldToCbetHands, profile.cbetFaced);
+  const foldTurn = profileRate(profile.foldTurnBetHands, profile.turnBetFaced);
+  const riverCall = profileRate(profile.riverCallHands, profile.riverBetFaced);
+
+  if (profile.stealFaced >= 4 && foldToSteal >= 62) {
+    behavior.openShift -= Math.round(3 * scale);
+    behavior.steal = clampProbability(behavior.steal + 0.12 * scale);
+  }
+  if (profile.threeBetFaced >= 4 && foldToThreeBet >= 55) {
+    behavior.threeBet = clampProbability(behavior.threeBet + 0.1 * scale);
+    behavior.openShift -= Math.round(2 * scale);
+  }
+  if (profile.cbetFaced >= 4 && foldToCbet >= 60) {
+    behavior.cbet = clampProbability(behavior.cbet + 0.15 * scale);
+    behavior.barrel = clampProbability(behavior.barrel + 0.08 * scale);
+    behavior.foldPressureShift += Math.round(7 * scale);
+  }
+  if (profile.turnBetFaced >= 4 && foldTurn >= 58) {
+    behavior.barrel = clampProbability(behavior.barrel + 0.12 * scale);
+    behavior.foldPressureShift += Math.round(5 * scale);
+  }
+  if (profile.riverBetFaced >= 4 && riverCall >= 50) {
+    behavior.bluff = clampProbability(behavior.bluff - 0.08 * scale);
+    behavior.thinValueShift += Math.round(8 * scale);
+  }
+  if (profile.hands >= 8 && vpip >= 42) {
+    behavior.bluff = clampProbability(behavior.bluff - 0.04 * scale);
+    behavior.thinValueShift += Math.round(5 * scale);
+  }
+  if (profile.hands >= 8 && vpip - pfr >= 18) {
+    behavior.threeBet = clampProbability(behavior.threeBet + 0.06 * scale);
+  }
+
+  return behavior;
 }
 
 function playerCount(state) {
@@ -65,6 +136,12 @@ function estimatePostflopScore(seat, board) {
   return category * 18 + high;
 }
 
+function potOddsPenalty(toCall, pot) {
+  if (toCall <= 0) return 0;
+  const ratio = toCall / Math.max(BIG_BLIND, pot + toCall);
+  return Math.round(ratio * 30);
+}
+
 function estimatePairStrength(seat, board) {
   const ranks = board.map((card) => card.rank);
   const holeRanks = seat.cards.map((card) => card.rank);
@@ -89,7 +166,7 @@ function chooseBetFraction(behavior, boardLength, pressureMode = false) {
 }
 
 function decidePreflop(state, seat) {
-  const behavior = getBehavior(seat);
+  const behavior = buildEffectiveBehavior(state, seat);
   const strength = holeCardStrength(seat.cards[0], seat.cards[1]);
   const toCall = Math.max(0, state.currentBet - seat.betStreet);
   const unopened = state.raiseCount === 0;
@@ -160,23 +237,45 @@ function decidePreflop(state, seat) {
 }
 
 function decidePostflop(state, seat) {
-  const behavior = getBehavior(seat);
-  const score = estimatePostflopScore(seat, state.board);
+  const behavior = buildEffectiveBehavior(state, seat);
+  const postflop = analyzePostflopSituation(seat.cards, state.board);
+  const madeScore = estimatePostflopScore(seat, state.board);
+  const drawPressure = postflop.draws.equityBonus;
+  const score = madeScore + drawPressure;
   const toCall = Math.max(0, state.currentBet - seat.betStreet);
   const unopened = state.currentBet === 0;
   const boardLength = state.board.length;
   const players = playerCount(state);
   const isPreflopAggressor = state.preflopAggressorId === seat.id;
-  const pressureMode = behavior.aggression > 0.62 || behavior.bluff > 0.24;
+  const pressureMode = behavior.aggression > 0.62 || behavior.bluff > 0.24 || postflop.semiBluffReady;
   const topPairish = estimatePairStrength(seat, state.board);
   const raiseAvailable = canSeatRaise(state, seat);
+  const valueBetThreshold = 94 - behavior.thinValueShift;
+  const callPenalty = potOddsPenalty(toCall, state.pot);
+  const heroStillIn = state.seats[HERO_SEAT_INDEX]?.inHand && !state.seats[HERO_SEAT_INDEX]?.folded;
+  const dryAggressorBoard = postflop.texture.cbetAdvantage === "preflop-aggressor";
+  const wetWithoutEquity = postflop.texture.label === "wet" && !postflop.semiBluffReady && !topPairish;
+  const cbetFrequency = clampProbability(
+    behavior.cbet +
+      (dryAggressorBoard ? 0.12 : 0) +
+      (postflop.semiBluffReady ? 0.1 : 0) -
+      (wetWithoutEquity ? 0.16 : 0)
+  );
+  const barrelThreshold =
+    50 -
+    behavior.foldPressureShift -
+    (postflop.semiBluffReady ? 12 : 0) +
+    (postflop.texture.label === "wet" && !postflop.semiBluffReady ? 8 : 0);
 
   if (unopened) {
-    if (score >= 94) {
+    if (score >= valueBetThreshold) {
       return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode) };
     }
-    if (isPreflopAggressor && boardLength === 3 && players <= 3 && Math.random() < behavior.cbet) {
+    if (isPreflopAggressor && boardLength === 3 && players <= 3 && Math.random() < cbetFrequency) {
       return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode && topPairish) };
+    }
+    if (isPreflopAggressor && boardLength > 3 && heroStillIn && Math.random() < behavior.barrel && score >= barrelThreshold) {
+      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode || drawPressure >= 10) };
     }
     if (score >= 72 && Math.random() < behavior.aggression) {
       return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode) };
@@ -187,7 +286,7 @@ function decidePostflop(state, seat) {
     return { type: "check" };
   }
 
-  if (score >= 102) {
+  if (score >= 102 - behavior.thinValueShift) {
     if (raiseAvailable && Math.random() < behavior.aggression) {
       return {
         type: "raise",
@@ -201,11 +300,15 @@ function decidePostflop(state, seat) {
     return { type: "call", amount: toCall };
   }
 
-  if (score >= 76 || (topPairish && score >= 58 && Math.random() < behavior.showdownCurious)) {
+  if (
+    score >= 76 + callPenalty ||
+    (postflop.semiBluffReady && score >= 62 + callPenalty && Math.random() < behavior.showdownCurious + 0.16) ||
+    (topPairish && score >= 58 + callPenalty && Math.random() < behavior.showdownCurious)
+  ) {
     return { type: "call", amount: toCall };
   }
 
-  if (score >= 58 && Math.random() < behavior.showdownCurious) {
+  if (score >= 58 + callPenalty && Math.random() < behavior.showdownCurious) {
     return { type: "call", amount: toCall };
   }
 

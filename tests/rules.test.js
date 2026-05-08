@@ -3,12 +3,14 @@ import {
   ACTION_TIMERS,
   BIG_BLIND,
   DEVIATED_ARCHETYPES,
-  ELITE_ARCHETYPES,
   POSITION_LABELS,
+  REGULAR_ARCHETYPES,
   SEAT_LAYOUT,
   STARTING_STACK
 } from "../src/config.js";
-import { chooseBotAction } from "../src/bots.js";
+import { buildEffectiveBehavior, chooseBotAction } from "../src/bots.js";
+import { buildHeroProfileReport, createHeroProfile, markHeroHand, recordHeroAction } from "../src/heroProfile.js";
+import { analyzeBoardTexture, analyzeDraws, analyzePostflopSituation } from "../src/postflopAnalysis.js";
 import {
   buildSidePots,
   classifyHoleCards,
@@ -177,11 +179,11 @@ describe("bot legality", () => {
 });
 
 describe("bot table pool", () => {
-  test("single table has 3 elite bots and 4 deviated bots with max duplicate 2", () => {
+  test("single table has 1 to 3 regular bots and fills the rest with mixed deviated bots", () => {
     const archetypes = pickArchetypes();
-    const eliteKeys = new Set(ELITE_ARCHETYPES.map((entry) => entry.key));
+    const regularKeys = new Set(REGULAR_ARCHETYPES.map((entry) => entry.key));
     const deviatedKeys = new Set(DEVIATED_ARCHETYPES.map((entry) => entry.key));
-    const elites = archetypes.filter((entry) => eliteKeys.has(entry.key));
+    const regulars = archetypes.filter((entry) => regularKeys.has(entry.key));
     const deviated = archetypes.filter((entry) => deviatedKeys.has(entry.key));
     const deviatedCounts = new Map();
     deviated.forEach((entry) => {
@@ -189,9 +191,82 @@ describe("bot table pool", () => {
     });
 
     expect(archetypes).toHaveLength(7);
-    expect(elites).toHaveLength(3);
-    expect(deviated).toHaveLength(4);
+    expect(regulars.length).toBeGreaterThanOrEqual(1);
+    expect(regulars.length).toBeLessThanOrEqual(3);
+    expect(deviated.length).toBe(7 - regulars.length);
     expect(Math.max(...deviatedCounts.values())).toBeLessThanOrEqual(2);
+  });
+
+  test("regular behavior adapts to exploitable hero memory", () => {
+    const regular = seat({
+      id: "reg",
+      position: "BTN",
+      archetype: { key: "regular-pressure", pool: "regular" }
+    });
+    const base = buildEffectiveBehavior({ heroProfile: createHeroProfile(), heroLongTermProfile: createHeroProfile() }, regular);
+    const profile = {
+      ...createHeroProfile(),
+      hands: 20,
+      vpipHands: 9,
+      pfrHands: 3,
+      stealFaced: 10,
+      foldToStealHands: 8,
+      cbetFaced: 10,
+      foldToCbetHands: 8
+    };
+    const adjusted = buildEffectiveBehavior({ heroProfile: createHeroProfile(), heroLongTermProfile: profile }, regular);
+    expect(adjusted.steal).toBeGreaterThan(base.steal);
+    expect(adjusted.cbet).toBeGreaterThan(base.cbet);
+    expect(adjusted.openShift).toBeLessThan(base.openShift);
+  });
+});
+
+describe("hero profile", () => {
+  test("tracks concrete data for review summaries", () => {
+    let profile = createHeroProfile();
+    profile = markHeroHand(profile);
+    profile = recordHeroAction(profile, { countVpip: true, countPfr: true }, "raise");
+    profile = recordHeroAction(profile, { countCbetFaced: true }, "fold");
+    const report = buildHeroProfileReport(profile, createHeroProfile());
+    expect(report.metrics.find((entry) => entry.label === "VPIP").value).toBe(100);
+    expect(report.metrics.find((entry) => entry.label === "Fold to c-bet").value).toBe(100);
+    expect(report.insights.length).toBeGreaterThan(0);
+  });
+});
+
+describe("postflop analysis", () => {
+  test("classifies dry paired ace-high boards as preflop aggressor friendly", () => {
+    const texture = analyzeBoardTexture([card("A", "s"), card("7", "d"), card("7", "c")]);
+    expect(texture.label).toBe("dry");
+    expect(texture.paired).toBe(true);
+    expect(texture.cbetAdvantage).toBe("preflop-aggressor");
+  });
+
+  test("detects wet two-tone connected boards", () => {
+    const texture = analyzeBoardTexture([card("J", "h"), card("T", "h"), card("9", "s")]);
+    expect(texture.label).toBe("wet");
+    expect(texture.twoTone).toBe(true);
+    expect(texture.connected).toBe(true);
+  });
+
+  test("detects combo draws and overcards for postflop decisions", () => {
+    const draws = analyzeDraws(
+      [card("Q", "h"), card("9", "h")],
+      [card("J", "h"), card("T", "h"), card("2", "c")]
+    );
+    expect(draws.flushDraw).toBe(true);
+    expect(draws.openEndedStraightDraw).toBe(true);
+    expect(draws.comboDraw).toBe(true);
+    expect(draws.overcards).toBe(1);
+  });
+
+  test("postflop situation exposes semi-bluff pressure score", () => {
+    const situation = analyzePostflopSituation(
+      [card("8", "s"), card("7", "s")],
+      [card("6", "s"), card("5", "d"), card("K", "s")]
+    );
+    expect(situation.semiBluffReady).toBe(true);
+    expect(situation.pressureScore).toBeGreaterThan(20);
   });
 });
 

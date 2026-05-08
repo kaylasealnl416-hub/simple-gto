@@ -1,20 +1,44 @@
-import { DEVIATED_ARCHETYPES, ELITE_ARCHETYPES } from "./config.js";
+import { DEVIATED_ARCHETYPES, REGULAR_ARCHETYPES } from "./config.js";
+
+function takeRandom(pool, random) {
+  const index = Math.floor(random() * pool.length);
+  return pool.splice(index, 1)[0];
+}
+
+function randomRegularCount(random) {
+  return 1 + Math.floor(random() * 3);
+}
+
+function shuffle(entries, random) {
+  const pool = [...entries];
+  const result = [];
+  while (pool.length) {
+    result.push(takeRandom(pool, random));
+  }
+  return result;
+}
 
 export function pickArchetypes(random = Math.random) {
-  const elites = [...ELITE_ARCHETYPES]
-    .sort(() => random() - 0.5)
-    .slice(0, 3)
-    .map((archetype) => ({ ...archetype, pool: "elite" }));
+  const regularCount = randomRegularCount(random);
+  const regularPool = [...REGULAR_ARCHETYPES];
+  const regulars = [];
+  while (regulars.length < regularCount) {
+    regulars.push({ ...takeRandom(regularPool, random), pool: "regular" });
+  }
 
-  const deviated = [];
+  const nonRegular = [];
   const counts = new Map();
-  while (deviated.length < 4) {
+  while (nonRegular.length < 7 - regularCount) {
     const picked = DEVIATED_ARCHETYPES[Math.floor(random() * DEVIATED_ARCHETYPES.length)];
     const count = counts.get(picked.key) ?? 0;
     if (count >= 2) continue;
     counts.set(picked.key, count + 1);
-    deviated.push({ ...picked, pool: "deviated" });
+    nonRegular.push({ ...picked, pool: "deviated" });
   }
 
-  return [...elites, ...deviated].sort(() => random() - 0.5);
+  const tableStrength = regularCount === 1 ? "soft" : regularCount === 2 ? "standard" : "tough";
+  return shuffle([...regulars, ...nonRegular], random).map((archetype) => ({
+    ...archetype,
+    tableStrength
+  }));
 }

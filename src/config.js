@@ -16,8 +16,8 @@ export const SEAT_LAYOUT = [
   { top: "7%", left: "40%" },
   { top: "7%", left: "69%" },
   { top: "32%", left: "78%" },
-  { top: "62%", left: "74%" },
-  { top: "75%", left: "53%" },
+  { top: "56%", left: "74%" },
+  { top: "74%", left: "68%" },
   { top: "74%", left: "29%" },
   { top: "61%", left: "4%" },
   { top: "31%", left: "7%" }
@@ -31,20 +31,68 @@ export const ACTION_TIMERS = {
 
 export const INITIAL_TIME_BANK = 15;
 
-export const ELITE_ARCHETYPES = [
-  { key: "elite-tag", label: "顶级 TAG" },
-  { key: "elite-balanced", label: "顶级平衡派" },
-  { key: "elite-pressure", label: "顶级压迫派" }
+export const REGULAR_ARCHETYPES = [
+  { key: "regular-tag", label: "强 Regular · TAG" },
+  { key: "regular-balanced", label: "强 Regular · 平衡型" },
+  { key: "regular-pressure", label: "强 Regular · 攻击型" }
 ];
+
+export const ELITE_ARCHETYPES = REGULAR_ARCHETYPES;
 
 export const DEVIATED_ARCHETYPES = [
   { key: "weak-tight", label: "紧弱" },
   { key: "lag", label: "松凶" },
   { key: "calling-station", label: "跟注站" },
-  { key: "maniac", label: "疯鱼" }
+  { key: "maniac", label: "疯鱼" },
+  { key: "recreational", label: "普通娱乐玩家" }
 ];
 
 export const ARCHETYPE_BEHAVIOR = {
+  "regular-tag": {
+    openShift: 2,
+    callShift: -4,
+    aggression: 0.58,
+    bluff: 0.18,
+    threeBet: 0.21,
+    coldCall: 0.42,
+    steal: 0.68,
+    cbet: 0.63,
+    barrel: 0.46,
+    defendBlind: 0.52,
+    showdownCurious: 0.24,
+    sizing: [2.4, 3.2],
+    delay: [900, 1800]
+  },
+  "regular-balanced": {
+    openShift: 0,
+    callShift: 0,
+    aggression: 0.52,
+    bluff: 0.16,
+    threeBet: 0.18,
+    coldCall: 0.5,
+    steal: 0.61,
+    cbet: 0.57,
+    barrel: 0.39,
+    defendBlind: 0.58,
+    showdownCurious: 0.28,
+    sizing: [2.5, 3.3],
+    delay: [1000, 1900]
+  },
+  "regular-pressure": {
+    openShift: -2,
+    callShift: -2,
+    aggression: 0.66,
+    bluff: 0.22,
+    threeBet: 0.27,
+    coldCall: 0.36,
+    steal: 0.76,
+    cbet: 0.71,
+    barrel: 0.54,
+    defendBlind: 0.63,
+    showdownCurious: 0.22,
+    sizing: [2.7, 3.6],
+    delay: [850, 1700]
+  },
   "elite-tag": {
     openShift: 2,
     callShift: -4,
@@ -149,6 +197,21 @@ export const ARCHETYPE_BEHAVIOR = {
     showdownCurious: 0.48,
     sizing: [3, 4.2],
     delay: [650, 1500]
+  },
+  recreational: {
+    openShift: -1,
+    callShift: -4,
+    aggression: 0.38,
+    bluff: 0.12,
+    threeBet: 0.1,
+    coldCall: 0.58,
+    steal: 0.5,
+    cbet: 0.42,
+    barrel: 0.24,
+    defendBlind: 0.55,
+    showdownCurious: 0.42,
+    sizing: [2.3, 3.1],
+    delay: [900, 1900]
   }
 };
 

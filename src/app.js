@@ -12,6 +12,15 @@ import {
 } from "./config.js";
 import { chooseBotAction, getBotDelayMs } from "./bots.js";
 import { buildRangeMatrix, getRecommendationForHand } from "./ranges.js";
+import {
+  HERO_PROFILE_STORAGE_KEY,
+  buildHeroProfileReport,
+  createHeroProfile,
+  markHeroHand,
+  markHeroShowdown,
+  normalizeHeroProfile,
+  recordHeroAction
+} from "./heroProfile.js";
 import { pickArchetypes } from "./tablePool.js";
 import { passiveSeatStatus, shouldPromptTopUp } from "./tableRules.js";
 import {
@@ -59,7 +68,8 @@ const state = {
   timerIntervalId: null,
   countdownIntervalId: null,
   botActionTimer: null,
-  streetRunoutTimer: null
+  streetRunoutTimer: null,
+  heroLongTermProfile: createHeroProfile()
 };
 
 function saveSession() {
@@ -77,6 +87,19 @@ function loadSession() {
   } catch {
     return null;
   }
+}
+
+function loadHeroLongTermProfile() {
+  try {
+    const raw = localStorage.getItem(HERO_PROFILE_STORAGE_KEY);
+    return normalizeHeroProfile(raw ? JSON.parse(raw) : null);
+  } catch {
+    return createHeroProfile();
+  }
+}
+
+function saveHeroLongTermProfile() {
+  localStorage.setItem(HERO_PROFILE_STORAGE_KEY, JSON.stringify(state.heroLongTermProfile));
 }
 
 function createSeat(id, seatIndex) {
@@ -107,7 +130,13 @@ function createSeat(id, seatIndex) {
     },
     handFlags: {
       vpipMarked: false,
-      pfrMarked: false
+      pfrMarked: false,
+      heroProfileStealFaced: false,
+      heroProfileThreeBetFaced: false,
+      heroProfileCbetFaced: false,
+      heroProfileTurnBetFaced: false,
+      heroProfileRiverBetFaced: false,
+      heroProfileShowdown: false
     },
     resultLabel: "持平",
     autoActions: {
@@ -160,6 +189,8 @@ function createSession() {
     lastMistake: null,
     lastRake: 0,
     pendingHeroTopUp: false,
+    heroProfile: createHeroProfile(),
+    heroLongTermProfile: normalizeHeroProfile(state.heroLongTermProfile),
     revealedSeatIds: [],
     sessionEndingAfterHand: false,
     timer: {
@@ -173,6 +204,7 @@ function createSession() {
 
 function beginNewSession() {
   clearTimers();
+  state.heroLongTermProfile = loadHeroLongTermProfile();
   state.session = createSession();
   state.rangeOpen = false;
   state.optionsOpen = false;
@@ -189,6 +221,9 @@ function beginNewSession() {
 function restoreSession(existing) {
   clearTimers();
   state.session = existing;
+  state.session.heroProfile = normalizeHeroProfile(state.session.heroProfile);
+  state.heroLongTermProfile = loadHeroLongTermProfile();
+  state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
   state.session.seats.forEach((seat) => {
     if (!Number.isFinite(seat.totalInvested)) {
       seat.totalInvested = STARTING_STACK;
@@ -230,6 +265,8 @@ function endSession() {
   if (!state.session) return;
   clearTimers();
   const hero = getHeroSeat();
+  state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
+  const profileReport = buildHeroProfileReport(state.session.heroProfile, state.heroLongTermProfile);
   const summary = {
     durationMs: Date.now() - state.session.startedAt,
     handCount: state.session.handNumber,
@@ -250,7 +287,8 @@ function endSession() {
       }))
       .sort((left, right) => right.result - left.result),
     mistake: state.session.lastMistake ?? state.session.pendingMistake,
-    recentHands: [...state.session.handHistory].slice(0, 6)
+    recentHands: [...state.session.handHistory].slice(0, 6),
+    profileReport
   };
   state.session.sessionSummary = summary;
   state.session.phase = "review";
@@ -275,6 +313,18 @@ function requestEndSession() {
     return;
   }
   endSession();
+}
+
+function resetHeroMemory() {
+  if (!window.confirm("确认清空 AI 对你的长期记忆？当前牌局不会被删除。")) {
+    return;
+  }
+  state.heroLongTermProfile = createHeroProfile();
+  if (state.session) {
+    state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
+  }
+  saveHeroLongTermProfile();
+  render();
 }
 
 function clearTimers() {
@@ -415,6 +465,18 @@ function resetForHand() {
     }
     seat.handFlags.vpipMarked = false;
     seat.handFlags.pfrMarked = false;
+    seat.handFlags.heroProfileStealFaced = false;
+    seat.handFlags.heroProfileThreeBetFaced = false;
+    seat.handFlags.heroProfileCbetFaced = false;
+    seat.handFlags.heroProfileTurnBetFaced = false;
+    seat.handFlags.heroProfileRiverBetFaced = false;
+    seat.handFlags.heroProfileShowdown = false;
+    if (seat.seatIndex === HERO_SEAT_INDEX && seat.inHand) {
+      state.session.heroProfile = markHeroHand(state.session.heroProfile);
+      state.heroLongTermProfile = markHeroHand(state.heroLongTermProfile);
+      state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
+      saveHeroLongTermProfile();
+    }
   });
 
   postBlind("SB", SMALL_BLIND);
@@ -673,6 +735,72 @@ function showdownOrder(seats) {
   });
 }
 
+function currentAggressorSeat(id) {
+  return state.session.seats.find((seat) => seat.id === id) ?? null;
+}
+
+function isLateStealAggressor(aggressor) {
+  return ["BTN", "CO", "SB"].includes(aggressor?.position);
+}
+
+function buildHeroProfileContext(hero, previousBet) {
+  const toCall = Math.max(0, previousBet - hero.betStreet);
+  const preflopAggressor = currentAggressorSeat(state.session.preflopAggressorId);
+  const streetAggressor = currentAggressorSeat(state.session.streetAggressorId);
+  const facingSteal =
+    state.session.street === "preflop" &&
+    toCall > 0 &&
+    ["SB", "BB"].includes(hero.position) &&
+    isLateStealAggressor(preflopAggressor);
+  const facingThreeBet =
+    state.session.street === "preflop" &&
+    toCall > 0 &&
+    state.session.raiseCount >= 2;
+  const facingCbet =
+    state.session.street === "flop" &&
+    toCall > 0 &&
+    streetAggressor?.id === state.session.preflopAggressorId &&
+    state.session.preflopAggressorId !== hero.id;
+
+  return {
+    countVpip: state.session.street === "preflop" && !hero.handFlags.vpipMarked,
+    countPfr: state.session.street === "preflop" && !hero.handFlags.pfrMarked,
+    countThreeBet: state.session.street === "preflop" && state.session.raiseCount >= 1,
+    countStealFaced: facingSteal && !hero.handFlags.heroProfileStealFaced,
+    countThreeBetFaced: facingThreeBet && !hero.handFlags.heroProfileThreeBetFaced,
+    countCbetFaced: facingCbet && !hero.handFlags.heroProfileCbetFaced,
+    countTurnBetFaced: state.session.street === "turn" && toCall > 0 && !hero.handFlags.heroProfileTurnBetFaced,
+    countRiverBetFaced: state.session.street === "river" && toCall > 0 && !hero.handFlags.heroProfileRiverBetFaced
+  };
+}
+
+function markHeroProfileContextFlags(hero, context) {
+  if (context.countStealFaced) hero.handFlags.heroProfileStealFaced = true;
+  if (context.countThreeBetFaced) hero.handFlags.heroProfileThreeBetFaced = true;
+  if (context.countCbetFaced) hero.handFlags.heroProfileCbetFaced = true;
+  if (context.countTurnBetFaced) hero.handFlags.heroProfileTurnBetFaced = true;
+  if (context.countRiverBetFaced) hero.handFlags.heroProfileRiverBetFaced = true;
+}
+
+function recordHeroActionProfile(hero, type, previousBet) {
+  const context = buildHeroProfileContext(hero, previousBet);
+  state.session.heroProfile = recordHeroAction(state.session.heroProfile, context, type);
+  state.heroLongTermProfile = recordHeroAction(state.heroLongTermProfile, context, type);
+  state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
+  markHeroProfileContextFlags(hero, context);
+  saveHeroLongTermProfile();
+}
+
+function recordHeroShowdownIfNeeded() {
+  const hero = getHeroSeat();
+  if (!hero || hero.folded || hero.handFlags.heroProfileShowdown) return;
+  hero.handFlags.heroProfileShowdown = true;
+  state.session.heroProfile = markHeroShowdown(state.session.heroProfile);
+  state.heroLongTermProfile = markHeroShowdown(state.heroLongTermProfile);
+  state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
+  saveHeroLongTermProfile();
+}
+
 function commitAction(seat, type, amount = 0) {
   if (!seat) return;
   state.confirmingAllIn = false;
@@ -693,6 +821,7 @@ function commitAction(seat, type, amount = 0) {
 
   if (seat.seatIndex === HERO_SEAT_INDEX) {
     captureHeroMistake(seat, type);
+    recordHeroActionProfile(seat, type, previousBet);
     clearAutoActions(seat);
   }
 
@@ -895,6 +1024,7 @@ function runBoardToShowdown() {
 
 function showdown() {
   const contenders = activeContenders();
+  recordHeroShowdownIfNeeded();
   state.session.revealedSeatIds = contenders.map((seat) => seat.id);
   const pots = buildSidePots(state.session.seats);
   const evaluations = new Map();
@@ -1070,6 +1200,7 @@ function queueBotIfNeeded() {
     clearTimeout(state.botActionTimer);
   }
   state.botActionTimer = setTimeout(() => {
+    state.session.heroLongTermProfile = normalizeHeroProfile(state.heroLongTermProfile);
     const action = chooseBotAction(state.session, actor);
     if (action.type === "fold" || action.type === "check") {
       commitAction(actor, action.type);
@@ -1444,9 +1575,24 @@ function renderRangeSheet(hero) {
   `;
 }
 
+function renderProfileMetrics(report) {
+  return report.metrics
+    .map(
+      (item) => `
+        <li class="profile-metric">
+          <span>${item.label}</span>
+          <strong>${item.value}%</strong>
+          <small>${item.sample} · ${item.detail}</small>
+        </li>
+      `
+    )
+    .join("");
+}
+
 function renderOptionsSheet() {
   const hero = getHeroSeat();
   const heroNet = seatNetResult(hero);
+  const profileReport = buildHeroProfileReport(state.session.heroProfile, state.heroLongTermProfile);
   const topUpAmount = Math.max(0, STARTING_STACK - hero.stack);
   const canRequestTopUp = hero.stack > 0 && topUpAmount > 0 && !state.session.pendingHeroTopUp;
   const topUpLabel = hero.stack >= STARTING_STACK
@@ -1494,6 +1640,14 @@ function renderOptionsSheet() {
                 )
                 .join("") || "<li class='history-item muted'>本场还没有完成的手牌。</li>"}
             </ul>
+          </div>
+          <div class="mini-panel">
+            <strong>AI 对我的记忆</strong>
+            <p>${profileReport.scope} · 本场 ${profileReport.sessionHands} 手 · 长期 ${profileReport.longTermHands} 手</p>
+            <ul class="profile-metrics compact">
+              ${renderProfileMetrics(profileReport)}
+            </ul>
+            <button class="modal-action danger" data-action="reset-hero-memory">重置 AI 对我的记忆</button>
           </div>
           <button class="modal-action" data-action="restart-session">重新开始</button>
           <button class="modal-action" data-action="show-help">规则说明</button>
@@ -1570,6 +1724,16 @@ function renderReviewCard() {
           <p>最终筹码：${formatAmount(summary.heroFinalStack)} · 用时 ${formatSessionTime(summary.durationMs)} · 共 ${summary.handCount} 手</p>
           <p>${summary.mistake ? `最大问题：${summary.mistake.street} · ${summary.mistake.summary}` : "本场没有记录到明显偏离。"} </p>
           ${summary.mistake ? `<p class="muted">问题手牌：${summary.mistake.hand} · 建议：${summary.mistake.recommendation}</p>` : ""}
+        </div>
+        <div class="review-section">
+          <strong class="review-subtitle">AI 记忆与长期漏洞</strong>
+          <p class="muted">${summary.profileReport.scope} · 本场 ${summary.profileReport.sessionHands} 手 · 长期 ${summary.profileReport.longTermHands} 手</p>
+          <ul class="profile-metrics">
+            ${renderProfileMetrics(summary.profileReport)}
+          </ul>
+          <ul class="review-list">
+            ${summary.profileReport.insights.map((insight) => `<li class="review-item"><p>${insight}</p></li>`).join("")}
+          </ul>
         </div>
         <div class="review-section">
           <strong class="review-subtitle">最近完成的手牌</strong>
@@ -1831,6 +1995,10 @@ function bindEvents() {
     button.addEventListener("click", beginNewSession);
   });
 
+  app.querySelectorAll("[data-action='reset-hero-memory']").forEach((button) => {
+    button.addEventListener("click", resetHeroMemory);
+  });
+
   app.querySelectorAll("[data-action='show-help']").forEach((button) => {
     button.addEventListener("click", () => {
       window.alert("固定规则：8-max / 10-20 / 200BB。抽水 5% 封顶 3BB，翻前未见翻牌不抽水。补码参照现金局通用规则，只允许在手与手之间发生。范围表只提供翻前辅助。");
@@ -1913,6 +2081,7 @@ function registerServiceWorker() {
 }
 
 function boot() {
+  state.heroLongTermProfile = loadHeroLongTermProfile();
   const existing = loadSession();
   registerServiceWorker();
   render();
