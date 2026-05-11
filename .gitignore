@@ -14,3 +14,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Local git worktrees (out-of-band working copies, not part of repo)
+/.worktrees/
