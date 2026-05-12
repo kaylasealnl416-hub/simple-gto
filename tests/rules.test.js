@@ -8,7 +8,7 @@ import {
   SEAT_LAYOUT,
   STARTING_STACK
 } from "../src/config.js";
-import { buildEffectiveBehavior, chooseBotAction, priorAggressiveStreets } from "../src/bots.js";
+import { buildBotPreflopPlan, buildEffectiveBehavior, chooseBotAction, priorAggressiveStreets } from "../src/bots.js";
 import { buildHeroProfileReport, createHeroProfile, markHeroHand, recordHeroAction } from "../src/heroProfile.js";
 import { analyzeBoardTexture, analyzeDraws, analyzePostflopSituation } from "../src/postflopAnalysis.js";
 import {
@@ -186,6 +186,84 @@ describe("bot legality", () => {
       bb
     );
     expect(action.type).toBe("check");
+  });
+
+  test("preflop profiles make weak-tight fold hands that LAG opens on the button", () => {
+    const cards = [card("A", "h"), card("5", "h")];
+    const baseState = {
+      street: "preflop",
+      currentBet: BIG_BLIND,
+      raiseCount: 0,
+      seats: []
+    };
+    const weakTight = seat({
+      id: "nit",
+      position: "BTN",
+      cards,
+      archetype: { key: "weak-tight", pool: "deviated" }
+    });
+    const lag = seat({
+      id: "lag",
+      position: "BTN",
+      cards,
+      archetype: { key: "lag", pool: "deviated" }
+    });
+
+    expect(chooseBotAction({ ...baseState, seats: [weakTight] }, weakTight).type).toBe("fold");
+    expect(chooseBotAction({ ...baseState, seats: [lag] }, lag).type).toBe("raise");
+  });
+
+  test("pressure regular turns suited ace blockers into more 3-bet pressure than TAG", () => {
+    const state = {
+      street: "preflop",
+      currentBet: BIG_BLIND * 3,
+      raiseCount: 1,
+      seats: []
+    };
+    const cards = [card("A", "s"), card("4", "s")];
+    const tag = seat({
+      id: "tag",
+      position: "BTN",
+      cards,
+      archetype: { key: "regular-tag", pool: "regular" }
+    });
+    const pressure = seat({
+      id: "pressure",
+      position: "BTN",
+      cards,
+      archetype: { key: "regular-pressure", pool: "regular" }
+    });
+
+    const tagPlan = buildBotPreflopPlan(state, tag);
+    const pressurePlan = buildBotPreflopPlan(state, pressure);
+    expect(pressurePlan.threeBetFloor).toBeLessThan(tagPlan.threeBetFloor);
+    expect(chooseBotAction({ ...state, seats: [pressure] }, pressure).type).toBe("raise");
+    expect(chooseBotAction({ ...state, seats: [tag] }, tag).type).not.toBe("raise");
+  });
+
+  test("calling station defends broadway hands that weak-tight releases versus a raise", () => {
+    const state = {
+      street: "preflop",
+      currentBet: BIG_BLIND * 3,
+      raiseCount: 1,
+      seats: []
+    };
+    const cards = [card("K", "h"), card("J", "d")];
+    const station = seat({
+      id: "station",
+      position: "BTN",
+      cards,
+      archetype: { key: "calling-station", pool: "deviated" }
+    });
+    const weakTight = seat({
+      id: "nit",
+      position: "BTN",
+      cards,
+      archetype: { key: "weak-tight", pool: "deviated" }
+    });
+
+    expect(chooseBotAction({ ...state, seats: [station] }, station).type).toBe("call");
+    expect(chooseBotAction({ ...state, seats: [weakTight] }, weakTight).type).toBe("fold");
   });
 });
 

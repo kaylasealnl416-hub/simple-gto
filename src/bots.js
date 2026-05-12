@@ -1,7 +1,7 @@
 import { ARCHETYPE_BEHAVIOR, BIG_BLIND, HERO_SEAT_INDEX } from "./config.js";
 import { normalizeHeroProfile, profileRate } from "./heroProfile.js";
 import { analyzePostflopSituation } from "./postflopAnalysis.js";
-import { evaluateSeven, handCategory, holeCardStrength } from "./poker.js";
+import { classifyHoleCards, evaluateSeven, handCategory, holeCardStrength } from "./poker.js";
 
 function rand(min, max) {
   return min + Math.random() * (max - min);
@@ -121,21 +121,244 @@ function canSeatRaise(state, seat) {
   return !seat.acted;
 }
 
-function positionPressure(position) {
-  return {
-    BTN: -8,
-    CO: -5,
-    HJ: -2,
-    MP: 0,
-    "UTG+1": 4,
-    UTG: 7,
-    SB: -1,
-    BB: 2
-  }[position] ?? 0;
-}
-
 function isBlind(position) {
   return position === "SB" || position === "BB";
+}
+
+const PREFLOP_RANK_ORDER = "23456789TJQKA";
+
+const PREFLOP_PROFILE = {
+  "regular-tag": {
+    openFloorShift: 2,
+    callFloorShift: 2,
+    threeBetFloorShift: 3,
+    stealWindow: 6,
+    bluffThreeBetWindow: 7,
+    defendFloorShift: 0,
+    pairBonus: 6,
+    suitedAceBonus: 5,
+    suitedConnectorBonus: 3,
+    weakOffsuitPenalty: 5
+  },
+  "regular-balanced": {
+    openFloorShift: 0,
+    callFloorShift: 0,
+    threeBetFloorShift: 0,
+    stealWindow: 8,
+    bluffThreeBetWindow: 8,
+    defendFloorShift: -2,
+    pairBonus: 7,
+    suitedAceBonus: 6,
+    suitedConnectorBonus: 4,
+    weakOffsuitPenalty: 4
+  },
+  "regular-pressure": {
+    openFloorShift: -4,
+    callFloorShift: 1,
+    threeBetFloorShift: -7,
+    stealWindow: 12,
+    bluffThreeBetWindow: 13,
+    defendFloorShift: -4,
+    pairBonus: 7,
+    suitedAceBonus: 9,
+    suitedConnectorBonus: 6,
+    weakOffsuitPenalty: 3
+  },
+  "elite-tag": {
+    openFloorShift: 2,
+    callFloorShift: 2,
+    threeBetFloorShift: 3,
+    stealWindow: 6,
+    bluffThreeBetWindow: 7,
+    defendFloorShift: 0,
+    pairBonus: 6,
+    suitedAceBonus: 5,
+    suitedConnectorBonus: 3,
+    weakOffsuitPenalty: 5
+  },
+  "elite-balanced": {
+    openFloorShift: 0,
+    callFloorShift: 0,
+    threeBetFloorShift: 0,
+    stealWindow: 8,
+    bluffThreeBetWindow: 8,
+    defendFloorShift: -2,
+    pairBonus: 7,
+    suitedAceBonus: 6,
+    suitedConnectorBonus: 4,
+    weakOffsuitPenalty: 4
+  },
+  "elite-pressure": {
+    openFloorShift: -4,
+    callFloorShift: 1,
+    threeBetFloorShift: -7,
+    stealWindow: 12,
+    bluffThreeBetWindow: 13,
+    defendFloorShift: -4,
+    pairBonus: 7,
+    suitedAceBonus: 9,
+    suitedConnectorBonus: 6,
+    weakOffsuitPenalty: 3
+  },
+  "weak-tight": {
+    openFloorShift: 12,
+    callFloorShift: 11,
+    threeBetFloorShift: 14,
+    stealWindow: 0,
+    bluffThreeBetWindow: 1,
+    defendFloorShift: 9,
+    pairBonus: 4,
+    suitedAceBonus: 2,
+    suitedConnectorBonus: 0,
+    weakOffsuitPenalty: 8
+  },
+  lag: {
+    openFloorShift: -7,
+    callFloorShift: -4,
+    threeBetFloorShift: -5,
+    stealWindow: 14,
+    bluffThreeBetWindow: 10,
+    defendFloorShift: -5,
+    pairBonus: 8,
+    suitedAceBonus: 8,
+    suitedConnectorBonus: 8,
+    weakOffsuitPenalty: 2
+  },
+  "calling-station": {
+    openFloorShift: 7,
+    callFloorShift: -13,
+    threeBetFloorShift: 13,
+    stealWindow: 3,
+    bluffThreeBetWindow: 0,
+    defendFloorShift: -12,
+    pairBonus: 8,
+    suitedAceBonus: 5,
+    suitedConnectorBonus: 5,
+    weakOffsuitPenalty: 3
+  },
+  maniac: {
+    openFloorShift: -14,
+    callFloorShift: -8,
+    threeBetFloorShift: -12,
+    stealWindow: 18,
+    bluffThreeBetWindow: 15,
+    defendFloorShift: -8,
+    pairBonus: 9,
+    suitedAceBonus: 8,
+    suitedConnectorBonus: 9,
+    weakOffsuitPenalty: 0
+  },
+  recreational: {
+    openFloorShift: 1,
+    callFloorShift: -5,
+    threeBetFloorShift: 7,
+    stealWindow: 6,
+    bluffThreeBetWindow: 3,
+    defendFloorShift: -3,
+    pairBonus: 7,
+    suitedAceBonus: 5,
+    suitedConnectorBonus: 5,
+    weakOffsuitPenalty: 4
+  }
+};
+
+const POSITION_OPEN_FLOOR = {
+  UTG: 86,
+  "UTG+1": 82,
+  MP: 78,
+  HJ: 73,
+  CO: 68,
+  BTN: 62,
+  SB: 66,
+  BB: 84
+};
+
+const POSITION_CALL_FLOOR = {
+  UTG: 88,
+  "UTG+1": 85,
+  MP: 81,
+  HJ: 77,
+  CO: 73,
+  BTN: 68,
+  SB: 70,
+  BB: 62
+};
+
+const POSITION_THREE_BET_FLOOR = {
+  UTG: 106,
+  "UTG+1": 102,
+  MP: 98,
+  HJ: 94,
+  CO: 90,
+  BTN: 86,
+  SB: 88,
+  BB: 84
+};
+
+function rankValue(rank) {
+  return PREFLOP_RANK_ORDER.indexOf(rank) + 2;
+}
+
+function getPreflopProfile(seat) {
+  return PREFLOP_PROFILE[seat.archetype.key] ?? PREFLOP_PROFILE.recreational;
+}
+
+function describePreflopHand(cards, profile) {
+  const hand = classifyHoleCards(cards[0], cards[1]);
+  const high = Math.max(rankValue(cards[0].rank), rankValue(cards[1].rank));
+  const low = Math.min(rankValue(cards[0].rank), rankValue(cards[1].rank));
+  const gap = high - low;
+  const paired = cards[0].rank === cards[1].rank;
+  const suited = cards[0].suit === cards[1].suit;
+  const aceHigh = high === 14;
+  const broadway = high >= 10 && low >= 10;
+  const suitedConnector = suited && gap >= 1 && gap <= 2 && low >= 5;
+  const suitedAce = suited && aceHigh;
+  const weakOffsuit = !suited && !paired && low <= 8 && gap >= 4;
+  const blocker = aceHigh || high >= 13;
+
+  let score = holeCardStrength(cards[0], cards[1]);
+  if (paired) score += profile.pairBonus;
+  if (suitedAce) score += profile.suitedAceBonus;
+  if (suitedConnector) score += profile.suitedConnectorBonus;
+  if (broadway) score += 4;
+  if (weakOffsuit) score -= profile.weakOffsuitPenalty;
+  if (aceHigh && low <= 5 && suited) score += 3;
+
+  return {
+    hand,
+    score,
+    paired,
+    suited,
+    blocker,
+    suitedConnector,
+    suitedAce
+  };
+}
+
+export function buildBotPreflopPlan(state, seat) {
+  const behavior = buildEffectiveBehavior(state, seat);
+  const profile = getPreflopProfile(seat);
+  const hand = describePreflopHand(seat.cards, profile);
+  const position = seat.position;
+  const openFloor = (POSITION_OPEN_FLOOR[position] ?? 74) + behavior.openShift + profile.openFloorShift;
+  const callFloor = (POSITION_CALL_FLOOR[position] ?? 76) + behavior.callShift + profile.callFloorShift;
+  const threeBetFloor =
+    (POSITION_THREE_BET_FLOOR[position] ?? 92) +
+    behavior.openShift +
+    profile.threeBetFloorShift -
+    Math.round(behavior.threeBet * 12);
+  const defendFloor = (POSITION_CALL_FLOOR.BB ?? 62) + profile.defendFloorShift + behavior.callShift;
+
+  return {
+    behavior,
+    profile,
+    hand,
+    openFloor,
+    callFloor,
+    threeBetFloor,
+    defendFloor
+  };
 }
 
 function preflopRaiseAmount(state, seat, behavior, multiplierBoost = 1) {
@@ -188,27 +411,23 @@ function chooseBetFraction(behavior, boardLength, pressureMode = false) {
 }
 
 function decidePreflop(state, seat) {
-  const behavior = buildEffectiveBehavior(state, seat);
-  const strength = holeCardStrength(seat.cards[0], seat.cards[1]);
+  const plan = buildBotPreflopPlan(state, seat);
+  const { behavior, profile, hand } = plan;
   const toCall = Math.max(0, state.currentBet - seat.betStreet);
   const unopened = state.raiseCount === 0;
-  const positionShift = positionPressure(seat.position);
   const players = playerCount(state);
-  const raiseThreshold = unopened ? 62 + behavior.openShift + positionShift : 80 + behavior.openShift + positionShift;
-  const callThreshold = unopened ? 90 : 62 + behavior.callShift + Math.max(0, positionShift - 2);
-  const reraiseThreshold = 92 + behavior.openShift;
   const lateStealSpot = unopened && ["BTN", "CO", "SB"].includes(seat.position) && players <= 5;
   const blindDefend = isBlind(seat.position) && toCall > 0;
   const raiseAvailable = canSeatRaise(state, seat);
 
   if (unopened) {
-    if (strength >= raiseThreshold) {
+    if (hand.score >= plan.openFloor) {
       return {
         type: "raise",
         amount: preflopRaiseAmount(state, seat, behavior)
       };
     }
-    if (lateStealSpot && Math.random() < behavior.steal && strength >= raiseThreshold - 8) {
+    if (lateStealSpot && Math.random() < behavior.steal && hand.score >= plan.openFloor - profile.stealWindow) {
       return {
         type: "raise",
         amount: preflopRaiseAmount(state, seat, behavior, 0.96)
@@ -220,7 +439,11 @@ function decidePreflop(state, seat) {
     return { type: "fold" };
   }
 
-  if (raiseAvailable && (strength >= reraiseThreshold || (strength >= raiseThreshold - 3 && Math.random() < behavior.threeBet))) {
+  if (
+    raiseAvailable &&
+    (hand.score >= plan.threeBetFloor ||
+      (hand.blocker && hand.score >= plan.threeBetFloor - profile.bluffThreeBetWindow && Math.random() < behavior.threeBet))
+  ) {
     return {
       type: "raise",
       amount: clamp(
@@ -231,8 +454,13 @@ function decidePreflop(state, seat) {
     };
   }
 
-  if (strength >= callThreshold) {
-    if (raiseAvailable && Math.random() < behavior.aggression * 0.18 && strength >= raiseThreshold - 4 && Math.random() < behavior.threeBet) {
+  if (hand.score >= plan.callFloor) {
+    if (
+      raiseAvailable &&
+      Math.random() < behavior.aggression * 0.18 &&
+      hand.score >= plan.threeBetFloor - profile.bluffThreeBetWindow &&
+      Math.random() < behavior.threeBet
+    ) {
       return {
         type: "raise",
         amount: clamp(
@@ -242,16 +470,16 @@ function decidePreflop(state, seat) {
         )
       };
     }
-    if (Math.random() < behavior.coldCall || blindDefend) {
+    if (hand.score >= plan.callFloor + 10 || Math.random() < behavior.coldCall || blindDefend) {
       return { type: "call", amount: toCall };
     }
   }
 
-  if (blindDefend && toCall <= BIG_BLIND * 3.5 && strength >= callThreshold - 10 && Math.random() < behavior.defendBlind) {
+  if (blindDefend && toCall <= BIG_BLIND * 3.5 && hand.score >= plan.defendFloor && Math.random() < behavior.defendBlind) {
     return { type: "call", amount: toCall };
   }
 
-  if (seat.position === "BB" && toCall <= BIG_BLIND * 0.5 && strength >= callThreshold - 8) {
+  if (seat.position === "BB" && toCall <= BIG_BLIND * 0.5 && hand.score >= plan.defendFloor - 8) {
     return { type: "call", amount: toCall };
   }
 

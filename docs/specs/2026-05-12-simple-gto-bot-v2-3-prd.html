@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>简单GTO · Bot V2.3 PRD</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #17202a;
+        background: #f6f8fb;
+        line-height: 1.65;
+      }
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 40px 22px 64px;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.25;
+        margin: 28px 0 12px;
+      }
+      h1 {
+        font-size: 34px;
+      }
+      h2 {
+        font-size: 22px;
+        border-top: 1px solid #dce3ed;
+        padding-top: 22px;
+      }
+      h3 {
+        font-size: 17px;
+      }
+      p,
+      li {
+        font-size: 15px;
+      }
+      .meta {
+        color: #667085;
+        margin-bottom: 30px;
+      }
+      section {
+        background: #fff;
+        border: 1px solid #dce3ed;
+        border-radius: 8px;
+        padding: 18px 22px;
+        margin: 14px 0;
+      }
+      ul {
+        padding-left: 22px;
+      }
+      strong {
+        color: #0f172a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>简单GTO · Bot V2.3 PRD</h1>
+      <p class="meta">生成日期：2026-05-12 · 状态：已确权，进入第一批实现</p>
+
+      <section>
+        <h2>背景</h2>
+        <p>当前 Bot V2 已完成 1-3 个 regular 桌池、本机长期画像、board texture、听牌识别、pot odds 与多街下注线。用户实测反馈是：7 个 AI 仍然打得偏弱，且不够符合各自牌手设定。</p>
+        <p>根因不是桌池数量，而是行为模型仍偏向“同一套决策函数 + 不同频率参数”。V2.3 需要让 AI 从参数差异升级为牌手策略差异。</p>
+      </section>
+
+      <section>
+        <h2>小版本目标</h2>
+        <ul>
+          <li>让 7 个 AI 的打法更像真实现金局牌手。</li>
+          <li>强 regular 不只是更凶，而是有更合理的翻前范围、3Bet、盲位防守和价值下注倾向。</li>
+          <li>非 regular 保留漏洞，但不能低智到破坏训练质量。</li>
+          <li>用户能明显感到不同 AI 的打法差异。</li>
+          <li>不引入完整 solver、云端模型调用或账号系统。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>第一批范围</h2>
+        <ul>
+          <li>建立牌手档案策略层。</li>
+          <li>给 regular / TAG / balanced / pressure / weak-tight / LAG / calling-station / maniac / recreational 配置翻前策略。</li>
+          <li>翻前决策接入位置范围。</li>
+          <li>面对 open 时区分 call、3Bet、fold。</li>
+          <li>盲位防守保留独立逻辑。</li>
+          <li>增加单元测试，确保不同 AI 同一场景下动作不同。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>验收标准</h2>
+        <ul>
+          <li><code>bun run verify</code> 通过。</li>
+          <li>同一手牌在 weak-tight 与 LAG / pressure regular 下会出现不同翻前策略。</li>
+          <li>regular 面对可 exploit 的用户长期画像会提高偷盲和 3Bet 压力。</li>
+          <li>BB 免费行动仍然 check，不会 fold。</li>
+          <li>文档、测试和代码在同一小版本提交中保持一致。</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
