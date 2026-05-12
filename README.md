@@ -16,7 +16,7 @@
 
 ## 本机验证
 
-```powershell
+```sh
 bun run verify
 ```
 
@@ -27,9 +27,15 @@ bun run verify
 
 如果 `.tmp-bun-build` 被留下，可以直接删除；它已加入 `.gitignore`。
 
-## 本机预览
+Windows 旧环境如果仍需要显式注入 `SystemRoot`，可以运行：
 
 ```powershell
+bun run verify:windows
+```
+
+## 本机预览
+
+```sh
 bun run serve
 ```
 
@@ -40,9 +46,19 @@ bun run serve
 
 如果 Windows 当前网络栈报“无法加载或初始化请求的服务提供程序”，这是本机网络服务问题，不代表 App 代码坏了。
 
-## 桌面一键打开
+## Mac mini 一键打开
 
-本机桌面快捷方式 `简单GTO` 会打开 `scripts/launch-local.ps1`，先确认 4173 端口上运行的是简单GTO，再用浏览器打开 `http://127.0.0.1:4173/#autostart` 并进入实战。
+```sh
+bash scripts/launch-local-mac.sh
+```
+
+脚本会确认 4173 端口上运行的是简单GTO；如果服务未启动，会自动启动本地服务，并用默认浏览器打开 `http://127.0.0.1:4173/#autostart` 进入实战。保持终端窗口运行即可持续使用，停止服务按 `Ctrl+C`。
+
+如果 4173 端口被其他程序占用，脚本会直接提示并退出。
+
+## Windows 桌面一键打开
+
+Windows 桌面快捷方式 `简单GTO` 会打开 `scripts/launch-local.ps1`，先确认 4173 端口上运行的是简单GTO，再用浏览器打开 `http://127.0.0.1:4173/#autostart` 并进入实战。
 
 如果上次牌桌存档损坏，页面会自动隔离旧存档并重新进入可启动状态；如果 4173 端口被其他程序占用，启动脚本会弹出明确提示。
 

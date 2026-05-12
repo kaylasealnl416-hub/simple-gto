@@ -6,7 +6,8 @@
   "scripts": {
     "test": "bun test",
     "build:check": "bun build ./src/app.js --target=browser --outdir=.tmp-bun-build",
-    "verify": "SystemRoot=C:/WINDOWS bun test && SystemRoot=C:/WINDOWS bun build ./src/app.js --target=browser --outdir=.tmp-bun-build",
+    "verify": "bun run test && bun run build:check",
+    "verify:windows": "SystemRoot=C:/WINDOWS bun test && SystemRoot=C:/WINDOWS bun build ./src/app.js --target=browser --outdir=.tmp-bun-build",
     "serve": "bun ./scripts/serve.js"
   }
 }
