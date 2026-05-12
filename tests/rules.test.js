@@ -3,12 +3,13 @@ import {
   ACTION_TIMERS,
   BIG_BLIND,
   DEVIATED_ARCHETYPES,
+  HERO_SEAT_INDEX,
   POSITION_LABELS,
   REGULAR_ARCHETYPES,
   SEAT_LAYOUT,
   STARTING_STACK
 } from "../src/config.js";
-import { buildBotPreflopPlan, buildEffectiveBehavior, chooseBotAction, priorAggressiveStreets } from "../src/bots.js";
+import { buildBotPostflopPlan, buildBotPreflopPlan, buildEffectiveBehavior, chooseBotAction, priorAggressiveStreets } from "../src/bots.js";
 import { buildHeroProfileReport, createHeroProfile, markHeroHand, recordHeroAction } from "../src/heroProfile.js";
 import { analyzeBoardTexture, analyzeDraws, analyzePostflopSituation } from "../src/postflopAnalysis.js";
 import {
@@ -323,6 +324,100 @@ describe("bot table pool", () => {
       "reg"
     );
     expect(streets).toEqual(["flop", "turn"]);
+  });
+});
+
+describe("bot postflop profiles", () => {
+  test("calling station keeps calling made hands that weak-tight releases", () => {
+    const board = [card("K", "s"), card("7", "d"), card("2", "c")];
+    const cards = [card("K", "h"), card("7", "c")];
+    const baseState = {
+      street: "flop",
+      board,
+      pot: BIG_BLIND * 15,
+      currentBet: BIG_BLIND * 3,
+      preflopAggressorId: "opener",
+      actionLog: [],
+      seats: []
+    };
+    const station = seat({
+      id: "station",
+      cards,
+      archetype: { key: "calling-station", pool: "deviated" }
+    });
+    const weakTight = seat({
+      id: "nit",
+      cards,
+      archetype: { key: "weak-tight", pool: "deviated" }
+    });
+    const stationPlan = buildBotPostflopPlan({ ...baseState, seats: [station] }, station);
+    const weakTightPlan = buildBotPostflopPlan({ ...baseState, seats: [weakTight] }, weakTight);
+
+    expect(stationPlan.callThreshold).toBeLessThan(weakTightPlan.callThreshold);
+    expect(chooseBotAction({ ...baseState, seats: [station] }, station).type).toBe("call");
+    expect(chooseBotAction({ ...baseState, seats: [weakTight] }, weakTight).type).toBe("fold");
+  });
+
+  test("pressure regular barrels draws wider than TAG regular", () => {
+    const board = [card("J", "h"), card("T", "h"), card("2", "c"), card("4", "s")];
+    const cards = [card("Q", "h"), card("9", "h")];
+    const baseState = {
+      street: "turn",
+      board,
+      pot: BIG_BLIND * 24,
+      currentBet: 0,
+      preflopAggressorId: "reg",
+      actionLog: [{ street: "flop", seatId: "reg", type: "bet" }],
+      seats: Array.from({ length: 8 }, (_, index) => seat({ id: `seat-${index}`, seatIndex: index, folded: true, inHand: false }))
+    };
+    const tag = seat({
+      id: "reg",
+      cards,
+      archetype: { key: "regular-tag", pool: "regular" }
+    });
+    const pressure = seat({
+      id: "reg",
+      cards,
+      archetype: { key: "regular-pressure", pool: "regular" }
+    });
+    baseState.seats[0] = pressure;
+    baseState.seats[HERO_SEAT_INDEX] = seat({ id: "hero", seatIndex: HERO_SEAT_INDEX, cards: [card("A", "c"), card("8", "d")] });
+
+    const tagPlan = buildBotPostflopPlan({ ...baseState, seats: [tag, ...baseState.seats.slice(1)] }, tag);
+    const pressurePlan = buildBotPostflopPlan(baseState, pressure);
+    expect(pressurePlan.postflop.semiBluffReady).toBe(true);
+    expect(pressurePlan.barrelFrequency).toBeGreaterThan(tagPlan.barrelFrequency);
+    expect(pressurePlan.barrelThreshold).toBeLessThan(tagPlan.barrelThreshold);
+    expect(pressurePlan.semiBluffBetThreshold).toBeLessThan(tagPlan.semiBluffBetThreshold);
+  });
+
+  test("maniac pressure sizing is larger than TAG sizing", () => {
+    const board = [card("A", "s"), card("8", "d"), card("3", "c")];
+    const baseState = {
+      street: "flop",
+      board,
+      pot: BIG_BLIND * 18,
+      currentBet: 0,
+      preflopAggressorId: "bot",
+      actionLog: [],
+      seats: []
+    };
+    const tag = seat({
+      id: "bot",
+      cards: [card("Q", "h"), card("Q", "d")],
+      archetype: { key: "regular-tag", pool: "regular" }
+    });
+    const maniac = seat({
+      id: "bot",
+      cards: [card("Q", "h"), card("Q", "d")],
+      archetype: { key: "maniac", pool: "deviated" }
+    });
+    const tagPlan = buildBotPostflopPlan({ ...baseState, seats: [tag] }, tag);
+    const maniacPlan = buildBotPostflopPlan({ ...baseState, seats: [maniac] }, maniac);
+
+    expect(maniacPlan.bluffFrequency).toBeGreaterThan(tagPlan.bluffFrequency);
+    expect(maniacPlan.sizing.pressure[0]).toBeGreaterThan(tagPlan.sizing.pressure[0]);
+    expect(maniacPlan.sizing.pressure[1]).toBeGreaterThan(tagPlan.sizing.pressure[1]);
   });
 });
 

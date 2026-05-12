@@ -1,7 +1,7 @@
 # 简单GTO · Bot V2.3 PRD
 
 > 生成日期：2026-05-12
-> 状态：已确权，进入第一批实现
+> 状态：已确权，第二批/第三批实现中
 
 ## 1. 背景
 
@@ -93,3 +93,34 @@
 - regular 面对可 exploit 的用户长期画像会提高偷盲和 3Bet 压力。
 - BB 免费行动仍然 check，不会 fold。
 - 文档、测试和代码在同一小版本提交中保持一致。
+
+## 7. 第二批范围：翻后策略
+
+第二批把翻后从统一分数判断升级为牌手画像驱动：
+
+- 强 Regular · TAG：干燥高张面稳定 c-bet，湿润无权益牌面减少空枪；河牌更重视价值下注。
+- 强 Regular · 平衡型：下注、过牌、跟注阈值更接近训练基准。
+- 强 Regular · 攻击型：有主动权时持续施压；有 blocker / draw 时更多 semi-bluff。
+- 紧弱：无强牌时减少 c-bet / barrel，面对压力更容易弃牌。
+- 松凶：更常用 probe、barrel 和 semi-bluff，但仍受牌面权益约束。
+- 跟注站：诈唬少、加注少、跟注阈值低，小到中等下注更难打走。
+- 疯鱼：攻击和加注频率最高，下注尺度更大，保留高波动特征。
+- 普通娱乐玩家：偏被动跟注，偶尔不合理 probe，但不极端。
+
+## 8. 第三批范围：下注尺度
+
+第三批给每类 AI 独立下注尺度：
+
+- 价值下注、诈唬下注、持续施压、试探下注、加注倍数分开配置。
+- TAG / balanced 尺度更稳定，pressure regular 更会用中大尺度压迫。
+- calling station 倾向小注跟注、少主动大注。
+- maniac 使用更宽、更大的下注尺度，制造波动。
+
+## 9. 第二/三批验收标准
+
+- `buildBotPostflopPlan` 暴露可测试的翻后计划。
+- 同一翻后局面下，weak-tight、calling-station、regular-pressure、maniac 的价值下注阈值、跟注阈值、诈唬频率和下注尺度明显不同。
+- 面对下注时 calling-station 比 weak-tight 更容易跟注。
+- regular-pressure 在有主动权和听牌权益时，比 regular-tag 更愿意持续施压。
+- maniac 的压力下注尺度高于 TAG。
+- 桌面快捷按钮仍指向主项目目录，不指向临时 worktree。

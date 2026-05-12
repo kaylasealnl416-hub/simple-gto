@@ -262,6 +262,306 @@ const PREFLOP_PROFILE = {
   }
 };
 
+const POSTFLOP_PROFILE = {
+  "regular-tag": {
+    valueBetShift: -2,
+    raiseValueShift: 0,
+    callThresholdShift: 4,
+    drawCallShift: 2,
+    topPairCallShift: 3,
+    cbetShift: 0.05,
+    barrelShift: 0.02,
+    bluffShift: -0.03,
+    semiBluffShift: 0.03,
+    pressureBias: 0.02,
+    barrelThresholdShift: 1,
+    probeThresholdShift: 4,
+    bluffThresholdShift: 8,
+    semiBluffBetShift: 2,
+    semiBluffRaiseShift: 4,
+    raiseFrequency: 0.12,
+    semiBluffRaiseFrequency: 0.08,
+    sizing: {
+      value: [0.48, 0.72],
+      cbet: [0.32, 0.48],
+      bluff: [0.38, 0.58],
+      pressure: [0.58, 0.82],
+      probe: [0.34, 0.5],
+      raise: [2.45, 3.1]
+    }
+  },
+  "regular-balanced": {
+    valueBetShift: 0,
+    raiseValueShift: 1,
+    callThresholdShift: 0,
+    drawCallShift: 0,
+    topPairCallShift: 0,
+    cbetShift: 0,
+    barrelShift: 0,
+    bluffShift: 0,
+    semiBluffShift: 0.02,
+    pressureBias: 0,
+    barrelThresholdShift: 0,
+    probeThresholdShift: 0,
+    bluffThresholdShift: 4,
+    semiBluffBetShift: 0,
+    semiBluffRaiseShift: 2,
+    raiseFrequency: 0.1,
+    semiBluffRaiseFrequency: 0.07,
+    sizing: {
+      value: [0.5, 0.76],
+      cbet: [0.33, 0.54],
+      bluff: [0.4, 0.62],
+      pressure: [0.58, 0.86],
+      probe: [0.34, 0.52],
+      raise: [2.4, 3.05]
+    }
+  },
+  "regular-pressure": {
+    valueBetShift: -5,
+    raiseValueShift: -3,
+    callThresholdShift: 1,
+    drawCallShift: -3,
+    topPairCallShift: 1,
+    cbetShift: 0.1,
+    barrelShift: 0.1,
+    bluffShift: 0.04,
+    semiBluffShift: 0.12,
+    pressureBias: 0.1,
+    barrelThresholdShift: -8,
+    probeThresholdShift: -4,
+    bluffThresholdShift: -2,
+    semiBluffBetShift: -9,
+    semiBluffRaiseShift: -6,
+    raiseFrequency: 0.18,
+    semiBluffRaiseFrequency: 0.18,
+    sizing: {
+      value: [0.56, 0.86],
+      cbet: [0.36, 0.62],
+      bluff: [0.48, 0.74],
+      pressure: [0.68, 1],
+      probe: [0.42, 0.62],
+      raise: [2.65, 3.55]
+    }
+  },
+  "elite-tag": {
+    valueBetShift: -2,
+    raiseValueShift: 0,
+    callThresholdShift: 4,
+    drawCallShift: 2,
+    topPairCallShift: 3,
+    cbetShift: 0.05,
+    barrelShift: 0.02,
+    bluffShift: -0.03,
+    semiBluffShift: 0.03,
+    pressureBias: 0.02,
+    barrelThresholdShift: 1,
+    probeThresholdShift: 4,
+    bluffThresholdShift: 8,
+    semiBluffBetShift: 2,
+    semiBluffRaiseShift: 4,
+    raiseFrequency: 0.12,
+    semiBluffRaiseFrequency: 0.08,
+    sizing: {
+      value: [0.48, 0.72],
+      cbet: [0.32, 0.48],
+      bluff: [0.38, 0.58],
+      pressure: [0.58, 0.82],
+      probe: [0.34, 0.5],
+      raise: [2.45, 3.1]
+    }
+  },
+  "elite-balanced": {
+    valueBetShift: 0,
+    raiseValueShift: 1,
+    callThresholdShift: 0,
+    drawCallShift: 0,
+    topPairCallShift: 0,
+    cbetShift: 0,
+    barrelShift: 0,
+    bluffShift: 0,
+    semiBluffShift: 0.02,
+    pressureBias: 0,
+    barrelThresholdShift: 0,
+    probeThresholdShift: 0,
+    bluffThresholdShift: 4,
+    semiBluffBetShift: 0,
+    semiBluffRaiseShift: 2,
+    raiseFrequency: 0.1,
+    semiBluffRaiseFrequency: 0.07,
+    sizing: {
+      value: [0.5, 0.76],
+      cbet: [0.33, 0.54],
+      bluff: [0.4, 0.62],
+      pressure: [0.58, 0.86],
+      probe: [0.34, 0.52],
+      raise: [2.4, 3.05]
+    }
+  },
+  "elite-pressure": {
+    valueBetShift: -5,
+    raiseValueShift: -3,
+    callThresholdShift: 1,
+    drawCallShift: -3,
+    topPairCallShift: 1,
+    cbetShift: 0.1,
+    barrelShift: 0.1,
+    bluffShift: 0.04,
+    semiBluffShift: 0.12,
+    pressureBias: 0.1,
+    barrelThresholdShift: -8,
+    probeThresholdShift: -4,
+    bluffThresholdShift: -2,
+    semiBluffBetShift: -9,
+    semiBluffRaiseShift: -6,
+    raiseFrequency: 0.18,
+    semiBluffRaiseFrequency: 0.18,
+    sizing: {
+      value: [0.56, 0.86],
+      cbet: [0.36, 0.62],
+      bluff: [0.48, 0.74],
+      pressure: [0.68, 1],
+      probe: [0.42, 0.62],
+      raise: [2.65, 3.55]
+    }
+  },
+  "weak-tight": {
+    valueBetShift: 12,
+    raiseValueShift: 10,
+    callThresholdShift: 14,
+    drawCallShift: 10,
+    topPairCallShift: 11,
+    cbetShift: -0.16,
+    barrelShift: -0.16,
+    bluffShift: -0.12,
+    semiBluffShift: -0.08,
+    pressureBias: -0.18,
+    barrelThresholdShift: 13,
+    probeThresholdShift: 14,
+    bluffThresholdShift: 22,
+    semiBluffBetShift: 14,
+    semiBluffRaiseShift: 16,
+    raiseFrequency: 0.04,
+    semiBluffRaiseFrequency: 0.01,
+    sizing: {
+      value: [0.42, 0.62],
+      cbet: [0.28, 0.42],
+      bluff: [0.28, 0.44],
+      pressure: [0.42, 0.62],
+      probe: [0.26, 0.38],
+      raise: [2.1, 2.65]
+    }
+  },
+  lag: {
+    valueBetShift: -6,
+    raiseValueShift: -4,
+    callThresholdShift: -2,
+    drawCallShift: -6,
+    topPairCallShift: -2,
+    cbetShift: 0.08,
+    barrelShift: 0.09,
+    bluffShift: 0.09,
+    semiBluffShift: 0.1,
+    pressureBias: 0.09,
+    barrelThresholdShift: -8,
+    probeThresholdShift: -9,
+    bluffThresholdShift: -8,
+    semiBluffBetShift: -10,
+    semiBluffRaiseShift: -8,
+    raiseFrequency: 0.16,
+    semiBluffRaiseFrequency: 0.16,
+    sizing: {
+      value: [0.54, 0.86],
+      cbet: [0.38, 0.66],
+      bluff: [0.48, 0.8],
+      pressure: [0.68, 1.05],
+      probe: [0.4, 0.64],
+      raise: [2.6, 3.55]
+    }
+  },
+  "calling-station": {
+    valueBetShift: 8,
+    raiseValueShift: 12,
+    callThresholdShift: -16,
+    drawCallShift: -13,
+    topPairCallShift: -18,
+    cbetShift: -0.14,
+    barrelShift: -0.14,
+    bluffShift: -0.12,
+    semiBluffShift: -0.04,
+    pressureBias: -0.16,
+    barrelThresholdShift: 10,
+    probeThresholdShift: 11,
+    bluffThresholdShift: 24,
+    semiBluffBetShift: 9,
+    semiBluffRaiseShift: 14,
+    raiseFrequency: 0.03,
+    semiBluffRaiseFrequency: 0.01,
+    sizing: {
+      value: [0.38, 0.6],
+      cbet: [0.28, 0.44],
+      bluff: [0.24, 0.38],
+      pressure: [0.36, 0.58],
+      probe: [0.28, 0.44],
+      raise: [2, 2.55]
+    }
+  },
+  maniac: {
+    valueBetShift: -12,
+    raiseValueShift: -11,
+    callThresholdShift: -8,
+    drawCallShift: -12,
+    topPairCallShift: -8,
+    cbetShift: 0.18,
+    barrelShift: 0.18,
+    bluffShift: 0.17,
+    semiBluffShift: 0.16,
+    pressureBias: 0.18,
+    barrelThresholdShift: -16,
+    probeThresholdShift: -18,
+    bluffThresholdShift: -16,
+    semiBluffBetShift: -16,
+    semiBluffRaiseShift: -14,
+    raiseFrequency: 0.24,
+    semiBluffRaiseFrequency: 0.24,
+    sizing: {
+      value: [0.68, 1.16],
+      cbet: [0.48, 0.88],
+      bluff: [0.66, 1.18],
+      pressure: [0.86, 1.38],
+      probe: [0.52, 0.9],
+      raise: [3, 4.5]
+    }
+  },
+  recreational: {
+    valueBetShift: 4,
+    raiseValueShift: 6,
+    callThresholdShift: -5,
+    drawCallShift: -4,
+    topPairCallShift: -5,
+    cbetShift: -0.04,
+    barrelShift: -0.06,
+    bluffShift: -0.02,
+    semiBluffShift: 0,
+    pressureBias: -0.04,
+    barrelThresholdShift: 5,
+    probeThresholdShift: 1,
+    bluffThresholdShift: 6,
+    semiBluffBetShift: 2,
+    semiBluffRaiseShift: 6,
+    raiseFrequency: 0.07,
+    semiBluffRaiseFrequency: 0.04,
+    sizing: {
+      value: [0.42, 0.72],
+      cbet: [0.3, 0.56],
+      bluff: [0.32, 0.6],
+      pressure: [0.48, 0.82],
+      probe: [0.3, 0.56],
+      raise: [2.2, 3]
+    }
+  }
+};
+
 const POSITION_OPEN_FLOOR = {
   UTG: 86,
   "UTG+1": 82,
@@ -301,6 +601,10 @@ function rankValue(rank) {
 
 function getPreflopProfile(seat) {
   return PREFLOP_PROFILE[seat.archetype.key] ?? PREFLOP_PROFILE.recreational;
+}
+
+function getPostflopProfile(seat) {
+  return POSTFLOP_PROFILE[seat.archetype.key] ?? POSTFLOP_PROFILE.recreational;
 }
 
 function describePreflopHand(cards, profile) {
@@ -397,17 +701,121 @@ function estimatePairStrength(seat, board) {
   return topHoleRank >= topBoardRank;
 }
 
-function chooseBetFraction(behavior, boardLength, pressureMode = false) {
-  if (pressureMode) {
-    return rand(0.58, 0.9);
-  }
-  if (boardLength === 3) {
-    return rand(0.33, 0.72);
-  }
-  if (boardLength === 4) {
-    return rand(0.46, 0.82);
-  }
-  return rand(0.55, 1.05);
+function streetAdjustedRange(range, boardLength, intent) {
+  const riverBoost = boardLength >= 5 && ["value", "pressure", "bluff"].includes(intent) ? 0.08 : 0;
+  const turnBoost = boardLength === 4 && ["pressure", "bluff"].includes(intent) ? 0.04 : 0;
+  return [range[0] + turnBoost + riverBoost, range[1] + turnBoost + riverBoost];
+}
+
+function choosePostflopBetFraction(plan, intent) {
+  const baseRange = plan.sizing[intent] ?? plan.sizing.value;
+  const range = streetAdjustedRange(baseRange, plan.boardLength, intent);
+  return rand(range[0], range[1]);
+}
+
+function choosePostflopRaiseMultiplier(plan) {
+  const [min, max] = plan.sizing.raise;
+  return rand(min, max);
+}
+
+export function buildBotPostflopPlan(state, seat) {
+  const behavior = buildEffectiveBehavior(state, seat);
+  const profile = getPostflopProfile(seat);
+  const postflop = analyzePostflopSituation(seat.cards, state.board);
+  const madeScore = estimatePostflopScore(seat, state.board);
+  const drawPressure = postflop.draws.equityBonus;
+  const score = madeScore + drawPressure;
+  const toCall = Math.max(0, state.currentBet - seat.betStreet);
+  const boardLength = state.board.length;
+  const players = playerCount(state);
+  const isPreflopAggressor = state.preflopAggressorId === seat.id;
+  const priorAggression = priorAggressiveStreets(state, seat.id);
+  const hasPriorPostflopAggression = priorAggression.length > 0;
+  const hasDoubleBarrelLine = priorAggression.includes("flop") && priorAggression.includes("turn");
+  const hasInitiative = isPreflopAggressor || hasPriorPostflopAggression;
+  const linePressureBonus = isRegular(seat)
+    ? hasDoubleBarrelLine
+      ? 12
+      : hasPriorPostflopAggression
+        ? 7
+        : 0
+    : hasPriorPostflopAggression
+      ? 3
+      : 0;
+  const topPairish = estimatePairStrength(seat, state.board);
+  const dryAggressorBoard = postflop.texture.cbetAdvantage === "preflop-aggressor";
+  const wetWithoutEquity = postflop.texture.label === "wet" && !postflop.semiBluffReady && !topPairish;
+  const cbetFrequency = clampProbability(
+    behavior.cbet +
+      profile.cbetShift +
+      (dryAggressorBoard ? 0.12 : 0) +
+      (postflop.semiBluffReady ? 0.1 + profile.semiBluffShift : 0) -
+      (wetWithoutEquity ? 0.16 : 0)
+  );
+  const barrelFrequency = clampProbability(behavior.barrel + profile.barrelShift + (postflop.semiBluffReady ? profile.semiBluffShift : 0));
+  const bluffFrequency = clampProbability(behavior.bluff + profile.bluffShift + (postflop.semiBluffReady ? profile.semiBluffShift / 2 : 0));
+  const semiBluffFrequency = clampProbability(behavior.bluff + behavior.aggression * 0.22 + profile.semiBluffShift);
+  const pressureMode =
+    behavior.aggression + profile.pressureBias > 0.62 ||
+    bluffFrequency > 0.24 ||
+    (postflop.semiBluffReady && profile.semiBluffShift >= 0.06);
+  const callPenalty = potOddsPenalty(toCall, state.pot);
+  const valueBetThreshold = 54 + profile.valueBetShift - behavior.thinValueShift - Math.round(linePressureBonus / 2);
+  const raiseValueThreshold = 86 + profile.raiseValueShift - behavior.thinValueShift;
+  const callThreshold = 48 + callPenalty + profile.callThresholdShift - Math.round(linePressureBonus / 2);
+  const drawCallThreshold = 38 + callPenalty + profile.drawCallShift;
+  const topPairCallThreshold = 34 + callPenalty + profile.topPairCallShift;
+  const marginalCallThreshold = 34 + callPenalty + profile.callThresholdShift;
+  const barrelThreshold =
+    34 +
+    profile.barrelThresholdShift -
+    behavior.foldPressureShift -
+    linePressureBonus -
+    (postflop.semiBluffReady ? 12 : 0) +
+    (postflop.texture.label === "wet" && !postflop.semiBluffReady ? 8 : 0);
+  const probeThreshold = 42 + profile.probeThresholdShift;
+  const bluffThreshold = 32 + profile.bluffThresholdShift;
+  const semiBluffBetThreshold = 38 + profile.semiBluffBetShift - Math.round(linePressureBonus / 2);
+  const semiBluffRaiseThreshold = 44 + callPenalty + profile.semiBluffRaiseShift;
+
+  return {
+    behavior,
+    profile,
+    postflop,
+    madeScore,
+    drawPressure,
+    score,
+    toCall,
+    boardLength,
+    players,
+    isPreflopAggressor,
+    priorAggression,
+    hasPriorPostflopAggression,
+    hasDoubleBarrelLine,
+    hasInitiative,
+    linePressureBonus,
+    topPairish,
+    dryAggressorBoard,
+    wetWithoutEquity,
+    cbetFrequency,
+    barrelFrequency,
+    bluffFrequency,
+    semiBluffFrequency,
+    pressureMode,
+    callPenalty,
+    valueBetThreshold,
+    raiseValueThreshold,
+    callThreshold,
+    drawCallThreshold,
+    topPairCallThreshold,
+    marginalCallThreshold,
+    barrelThreshold,
+    probeThreshold,
+    bluffThreshold,
+    semiBluffBetThreshold,
+    semiBluffRaiseThreshold,
+    sizing: profile.sizing
+  };
 }
 
 function decidePreflop(state, seat) {
@@ -487,75 +895,40 @@ function decidePreflop(state, seat) {
 }
 
 function decidePostflop(state, seat) {
-  const behavior = buildEffectiveBehavior(state, seat);
-  const postflop = analyzePostflopSituation(seat.cards, state.board);
-  const madeScore = estimatePostflopScore(seat, state.board);
-  const drawPressure = postflop.draws.equityBonus;
-  const score = madeScore + drawPressure;
-  const toCall = Math.max(0, state.currentBet - seat.betStreet);
+  const plan = buildBotPostflopPlan(state, seat);
+  const { behavior, postflop, score, toCall } = plan;
   const unopened = state.currentBet === 0;
-  const boardLength = state.board.length;
-  const players = playerCount(state);
-  const isPreflopAggressor = state.preflopAggressorId === seat.id;
-  const priorAggression = priorAggressiveStreets(state, seat.id);
-  const hasPriorPostflopAggression = priorAggression.length > 0;
-  const hasDoubleBarrelLine = priorAggression.includes("flop") && priorAggression.includes("turn");
-  const hasInitiative = isPreflopAggressor || hasPriorPostflopAggression;
-  const linePressureBonus = isRegular(seat)
-    ? hasDoubleBarrelLine
-      ? 12
-      : hasPriorPostflopAggression
-        ? 7
-        : 0
-    : hasPriorPostflopAggression
-      ? 3
-      : 0;
-  const pressureMode = behavior.aggression > 0.62 || behavior.bluff > 0.24 || postflop.semiBluffReady;
-  const topPairish = estimatePairStrength(seat, state.board);
   const raiseAvailable = canSeatRaise(state, seat);
-  const valueBetThreshold = 94 - behavior.thinValueShift - Math.round(linePressureBonus / 2);
-  const callPenalty = potOddsPenalty(toCall, state.pot);
   const heroStillIn = state.seats[HERO_SEAT_INDEX]?.inHand && !state.seats[HERO_SEAT_INDEX]?.folded;
-  const dryAggressorBoard = postflop.texture.cbetAdvantage === "preflop-aggressor";
-  const wetWithoutEquity = postflop.texture.label === "wet" && !postflop.semiBluffReady && !topPairish;
-  const cbetFrequency = clampProbability(
-    behavior.cbet +
-      (dryAggressorBoard ? 0.12 : 0) +
-      (postflop.semiBluffReady ? 0.1 : 0) -
-      (wetWithoutEquity ? 0.16 : 0)
-  );
-  const barrelThreshold =
-    50 -
-    behavior.foldPressureShift -
-    linePressureBonus -
-    (postflop.semiBluffReady ? 12 : 0) +
-    (postflop.texture.label === "wet" && !postflop.semiBluffReady ? 8 : 0);
 
   if (unopened) {
-    if (score >= valueBetThreshold) {
-      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode) };
+    if (score >= plan.valueBetThreshold) {
+      return { type: "bet", amount: state.pot * choosePostflopBetFraction(plan, plan.pressureMode ? "pressure" : "value") };
     }
-    if (isPreflopAggressor && boardLength === 3 && players <= 3 && Math.random() < cbetFrequency) {
-      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode && topPairish) };
+    if (plan.isPreflopAggressor && plan.boardLength === 3 && plan.players <= 3 && Math.random() < plan.cbetFrequency) {
+      return { type: "bet", amount: state.pot * choosePostflopBetFraction(plan, postflop.semiBluffReady ? "pressure" : "cbet") };
     }
-    if (hasInitiative && boardLength > 3 && heroStillIn && Math.random() < behavior.barrel && score >= barrelThreshold) {
-      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode || drawPressure >= 10) };
+    if (plan.hasInitiative && plan.boardLength > 3 && heroStillIn && Math.random() < plan.barrelFrequency && score >= plan.barrelThreshold) {
+      return { type: "bet", amount: state.pot * choosePostflopBetFraction(plan, plan.pressureMode || plan.drawPressure >= 10 ? "pressure" : "value") };
     }
-    if (score >= 72 && Math.random() < behavior.aggression) {
-      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, pressureMode) };
+    if (postflop.semiBluffReady && score >= plan.semiBluffBetThreshold && Math.random() < plan.semiBluffFrequency) {
+      return { type: "bet", amount: state.pot * choosePostflopBetFraction(plan, "pressure") };
     }
-    if (score >= 48 && Math.random() < behavior.bluff) {
-      return { type: "bet", amount: state.pot * chooseBetFraction(behavior, boardLength, false) };
+    if (score >= plan.probeThreshold && Math.random() < behavior.aggression) {
+      return { type: "bet", amount: state.pot * choosePostflopBetFraction(plan, plan.pressureMode ? "pressure" : "probe") };
+    }
+    if (score >= plan.bluffThreshold && Math.random() < plan.bluffFrequency) {
+      return { type: "bet", amount: state.pot * choosePostflopBetFraction(plan, "bluff") };
     }
     return { type: "check" };
   }
 
-  if (score >= 102 - behavior.thinValueShift) {
-    if (raiseAvailable && Math.random() < behavior.aggression) {
+  if (score >= plan.raiseValueThreshold) {
+    if (raiseAvailable && Math.random() < Math.max(behavior.aggression, plan.profile.raiseFrequency)) {
       return {
         type: "raise",
         amount: clamp(
-          state.currentBet * rand(2.35, pressureMode ? 3.6 : 3.1),
+          state.currentBet * choosePostflopRaiseMultiplier(plan),
           state.currentBet + BIG_BLIND * 2,
           seat.stack + seat.betStreet
         )
@@ -565,14 +938,30 @@ function decidePostflop(state, seat) {
   }
 
   if (
-    score >= 76 + callPenalty - Math.round(linePressureBonus / 2) ||
-    (postflop.semiBluffReady && score >= 62 + callPenalty && Math.random() < behavior.showdownCurious + 0.16) ||
-    (topPairish && score >= 58 + callPenalty && Math.random() < behavior.showdownCurious)
+    raiseAvailable &&
+    postflop.semiBluffReady &&
+    score >= plan.semiBluffRaiseThreshold &&
+    Math.random() < plan.profile.semiBluffRaiseFrequency
+  ) {
+    return {
+      type: "raise",
+      amount: clamp(
+        state.currentBet * choosePostflopRaiseMultiplier(plan),
+        state.currentBet + BIG_BLIND * 2,
+        seat.stack + seat.betStreet
+      )
+    };
+  }
+
+  if (
+    score >= plan.callThreshold ||
+    (postflop.semiBluffReady && score >= plan.drawCallThreshold && Math.random() < behavior.showdownCurious + 0.16) ||
+    (plan.topPairish && score >= plan.topPairCallThreshold && Math.random() < behavior.showdownCurious)
   ) {
     return { type: "call", amount: toCall };
   }
 
-  if (score >= 58 + callPenalty && Math.random() < behavior.showdownCurious) {
+  if (score >= plan.marginalCallThreshold && Math.random() < behavior.showdownCurious) {
     return { type: "call", amount: toCall };
   }
 
