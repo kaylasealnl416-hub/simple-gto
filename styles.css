@@ -991,11 +991,32 @@ button:disabled {
   font-size: 13px;
 }
 
+.history-item > span:last-child {
+  max-width: 48%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .history-item small {
   display: inline-block;
   margin-top: 4px;
   color: rgba(237, 245, 243, 0.72);
   line-height: 1.45;
+}
+
+.history-item .hand-review {
+  display: block;
+  margin-top: 6px;
+  color: rgba(237, 245, 243, 0.72);
+  line-height: 1.35;
+}
+
+.history-item .hand-review.good {
+  color: #8ff0c7;
+}
+
+.history-item .hand-review.leak {
+  color: #ffb0a3;
 }
 
 .history-item:first-child {

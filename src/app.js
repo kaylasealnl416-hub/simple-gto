@@ -37,6 +37,7 @@ import {
   uncalledAmountForWinner
 } from "./poker.js";
 import { isValidSessionSnapshot, readJsonStorage, writeJsonStorage } from "./storageGuard.js";
+import { buildHandReview } from "./handReview.js";
 
 const STORAGE_KEY = "simple-gto-v1-session";
 const RAKE_PERCENT = 0.05;
@@ -730,7 +731,11 @@ function captureHeroMistake(seat, actionType) {
 }
 
 function recordHandHistory(entry) {
-  state.session.handHistory.unshift(entry);
+  const reviewedEntry = {
+    ...entry,
+    review: entry.review ?? buildHandReview(entry)
+  };
+  state.session.handHistory.unshift(reviewedEntry);
   state.session.handHistory = state.session.handHistory.slice(0, 18);
 }
 
@@ -965,7 +970,11 @@ function awardWithoutShowdown(winner) {
     rake,
     result: `${winner.name} 直接赢下 ${formatAmount(total - rake)}`,
     board: [...state.session.board],
-    heroCards: [...getHeroSeat().cards]
+    heroCards: [...getHeroSeat().cards],
+    heroFolded: getHeroSeat().folded,
+    heroWon: winner.seatIndex === HERO_SEAT_INDEX,
+    wentShowdown: false,
+    mistake: state.session.pendingMistake
   });
   finishHand();
 }
@@ -1118,7 +1127,11 @@ function showdown() {
     rake,
     result: `摊牌结算 · ${winnerNames}`,
     board: [...state.session.board],
-    heroCards: [...getHeroSeat().cards]
+    heroCards: [...getHeroSeat().cards],
+    heroFolded: getHeroSeat().folded,
+    heroWon: winnersSummary.has(getHeroSeat().id),
+    wentShowdown: true,
+    mistake: state.session.pendingMistake
   });
   finishHand();
 }
@@ -1630,6 +1643,15 @@ function renderProfileMetrics(report) {
     .join("");
 }
 
+function renderHandReviewText(hand) {
+  if (!hand.review) return "";
+  return `
+    <small class="hand-review ${hand.review.tone}">
+      ${hand.review.headline}<br>${hand.review.nextStep}
+    </small>
+  `;
+}
+
 function renderOptionsSheet() {
   const hero = getHeroSeat();
   const heroNet = seatNetResult(hero);
@@ -1675,7 +1697,7 @@ function renderOptionsSheet() {
                   (hand) => `
                     <li class="history-item">
                       <span>#${hand.handNumber} · ${hand.street}<br><small>你：${compactCardText(hand.heroCards)} · 牌面：${compactCardText(hand.board)}</small></span>
-                      <span>${hand.result}</span>
+                      <span>${hand.result}${renderHandReviewText(hand)}</span>
                     </li>
                   `
                 )
@@ -1784,7 +1806,7 @@ function renderReviewCard() {
                 (hand) => `
                   <li class="history-item">
                     <span>#${hand.handNumber} · ${hand.street}<br><small>你：${compactCardText(hand.heroCards)} · 牌面：${compactCardText(hand.board)}</small></span>
-                    <span>${hand.result}</span>
+                    <span>${hand.result}${renderHandReviewText(hand)}</span>
                   </li>
                 `
               )

@@ -11,6 +11,7 @@ import {
 } from "../src/config.js";
 import { buildBotPostflopPlan, buildBotPreflopPlan, buildEffectiveBehavior, chooseBotAction, priorAggressiveStreets } from "../src/bots.js";
 import { buildHeroProfileReport, createHeroProfile, markHeroHand, recordHeroAction } from "../src/heroProfile.js";
+import { buildHandReview } from "../src/handReview.js";
 import { analyzeBoardTexture, analyzeDraws, analyzePostflopSituation } from "../src/postflopAnalysis.js";
 import {
   buildSidePots,
@@ -431,6 +432,64 @@ describe("hero profile", () => {
     expect(report.metrics.find((entry) => entry.label === "VPIP").value).toBe(100);
     expect(report.metrics.find((entry) => entry.label === "Fold to c-bet").value).toBe(100);
     expect(report.insights.length).toBeGreaterThan(0);
+  });
+});
+
+describe("hand review", () => {
+  test("prioritizes captured mistakes in the review note", () => {
+    const review = buildHandReview({
+      street: "翻前",
+      pot: BIG_BLIND * 8,
+      heroCards: [card("K", "h"), card("J", "d")],
+      board: [],
+      heroWon: false,
+      heroFolded: false,
+      wentShowdown: false,
+      result: "对手赢下底池",
+      mistake: {
+        street: "翻前",
+        summary: "翻前跟注范围过宽",
+        recommendation: "弃牌"
+      }
+    });
+
+    expect(review.tone).toBe("leak");
+    expect(review.headline).toContain("偏离建议");
+    expect(review.detail).toContain("KJo");
+  });
+
+  test("recognizes non-showdown pots won by hero", () => {
+    const review = buildHandReview({
+      street: "翻牌",
+      pot: BIG_BLIND * 12,
+      heroCards: [card("A", "s"), card("Q", "s")],
+      board: [card("Q", "h"), card("7", "d"), card("2", "c")],
+      heroWon: true,
+      heroFolded: false,
+      wentShowdown: false,
+      result: "你直接赢下底池"
+    });
+
+    expect(review.tone).toBe("good");
+    expect(review.headline).toBe("非摊牌拿下底池");
+    expect(review.nextStep).toContain("施压");
+  });
+
+  test("summarizes showdown losses with made hand context", () => {
+    const review = buildHandReview({
+      street: "摊牌",
+      pot: BIG_BLIND * 20,
+      heroCards: [card("A", "s"), card("Q", "d")],
+      board: [card("Q", "h"), card("7", "d"), card("2", "c"), card("4", "s"), card("9", "h")],
+      heroWon: false,
+      heroFolded: false,
+      wentShowdown: true,
+      result: "摊牌结算"
+    });
+
+    expect(review.tone).toBe("neutral");
+    expect(review.headline).toContain("摊牌未赢");
+    expect(review.detail).toContain("AQo");
   });
 });
 
