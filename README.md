@@ -27,6 +27,14 @@ bun run verify
 
 如果 `.tmp-bun-build` 被留下，可以直接删除；它已加入 `.gitignore`。
 
+UI 冒烟验收可以运行：
+
+```sh
+bun run smoke:ui
+```
+
+它会自动启动本地服务，检查桌面和手机视口是否能进入牌桌、是否渲染 8 个座位、选项面板是否能打开，并把截图放到系统临时目录。完整本地验收可以运行 `bun run verify:ui`。
+
 Windows 旧环境如果仍需要显式注入 `SystemRoot`，可以运行：
 
 ```powershell
