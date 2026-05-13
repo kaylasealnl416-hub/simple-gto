@@ -190,16 +190,16 @@ describe("bot legality", () => {
     expect(action.type).toBe("check");
   });
 
-  test("preflop profiles make weak-tight fold hands that LAG opens on the button", () => {
-    const cards = [card("A", "h"), card("5", "h")];
+  test("preflop profiles make tight defense fold speculative hands that LAG opens on the button", () => {
+    const cards = [card("8", "h"), card("6", "h")];
     const baseState = {
       street: "preflop",
       currentBet: BIG_BLIND,
       raiseCount: 0,
       seats: []
     };
-    const weakTight = seat({
-      id: "nit",
+    const tightDefense = seat({
+      id: "tight",
       position: "BTN",
       cards,
       archetype: { key: "weak-tight", pool: "deviated" }
@@ -211,7 +211,7 @@ describe("bot legality", () => {
       archetype: { key: "lag", pool: "deviated" }
     });
 
-    expect(chooseBotAction({ ...baseState, seats: [weakTight] }, weakTight).type).toBe("fold");
+    expect(chooseBotAction({ ...baseState, seats: [tightDefense] }, tightDefense).type).toBe("fold");
     expect(chooseBotAction({ ...baseState, seats: [lag] }, lag).type).toBe("raise");
   });
 
@@ -243,7 +243,7 @@ describe("bot legality", () => {
     expect(chooseBotAction({ ...state, seats: [tag] }, tag).type).not.toBe("raise");
   });
 
-  test("calling station defends broadway hands that weak-tight releases versus a raise", () => {
+  test("showdown-control defends broadway hands with a wider call floor than tight defense", () => {
     const state = {
       street: "preflop",
       currentBet: BIG_BLIND * 3,
@@ -251,26 +251,29 @@ describe("bot legality", () => {
       seats: []
     };
     const cards = [card("K", "h"), card("J", "d")];
-    const station = seat({
-      id: "station",
+    const showdownControl = seat({
+      id: "showdown",
       position: "BTN",
       cards,
       archetype: { key: "calling-station", pool: "deviated" }
     });
-    const weakTight = seat({
-      id: "nit",
+    const tightDefense = seat({
+      id: "tight",
       position: "BTN",
       cards,
       archetype: { key: "weak-tight", pool: "deviated" }
     });
+    const showdownPlan = buildBotPreflopPlan(state, showdownControl);
+    const tightPlan = buildBotPreflopPlan(state, tightDefense);
 
-    expect(chooseBotAction({ ...state, seats: [station] }, station).type).toBe("call");
-    expect(chooseBotAction({ ...state, seats: [weakTight] }, weakTight).type).toBe("fold");
+    expect(showdownPlan.callFloor).toBeLessThan(tightPlan.callFloor);
+    expect(chooseBotAction({ ...state, seats: [showdownControl] }, showdownControl).type).toBe("call");
+    expect(tightPlan.hand.score).toBeGreaterThanOrEqual(tightPlan.callFloor);
   });
 });
 
 describe("bot table pool", () => {
-  test("single table has 1 to 3 regular bots and fills the rest with mixed deviated bots", () => {
+  test("single table has 7 strong bots with mixed specialist styles", () => {
     const archetypes = pickArchetypes();
     const regularKeys = new Set(REGULAR_ARCHETYPES.map((entry) => entry.key));
     const deviatedKeys = new Set(DEVIATED_ARCHETYPES.map((entry) => entry.key));
@@ -285,6 +288,9 @@ describe("bot table pool", () => {
     expect(regulars.length).toBeGreaterThanOrEqual(1);
     expect(regulars.length).toBeLessThanOrEqual(3);
     expect(deviated.length).toBe(7 - regulars.length);
+    expect(archetypes.every((entry) => entry.label.includes("强"))).toBe(true);
+    expect(archetypes.every((entry) => !/(弱|鱼|娱乐|跟注站)/.test(entry.label))).toBe(true);
+    expect(archetypes.every((entry) => ["strong", "tough", "elite"].includes(entry.tableStrength))).toBe(true);
     expect(Math.max(...deviatedCounts.values())).toBeLessThanOrEqual(2);
   });
 
@@ -329,7 +335,7 @@ describe("bot table pool", () => {
 });
 
 describe("bot postflop profiles", () => {
-  test("calling station keeps calling made hands that weak-tight releases", () => {
+  test("showdown-control keeps a lower bluff-catch threshold than tight defense", () => {
     const board = [card("K", "s"), card("7", "d"), card("2", "c")];
     const cards = [card("K", "h"), card("7", "c")];
     const baseState = {
@@ -341,22 +347,23 @@ describe("bot postflop profiles", () => {
       actionLog: [],
       seats: []
     };
-    const station = seat({
-      id: "station",
+    const showdownControl = seat({
+      id: "showdown",
       cards,
       archetype: { key: "calling-station", pool: "deviated" }
     });
-    const weakTight = seat({
-      id: "nit",
+    const tightDefense = seat({
+      id: "tight",
       cards,
       archetype: { key: "weak-tight", pool: "deviated" }
     });
-    const stationPlan = buildBotPostflopPlan({ ...baseState, seats: [station] }, station);
-    const weakTightPlan = buildBotPostflopPlan({ ...baseState, seats: [weakTight] }, weakTight);
+    const showdownPlan = buildBotPostflopPlan({ ...baseState, seats: [showdownControl] }, showdownControl);
+    const tightPlan = buildBotPostflopPlan({ ...baseState, seats: [tightDefense] }, tightDefense);
 
-    expect(stationPlan.callThreshold).toBeLessThan(weakTightPlan.callThreshold);
-    expect(chooseBotAction({ ...baseState, seats: [station] }, station).type).toBe("call");
-    expect(chooseBotAction({ ...baseState, seats: [weakTight] }, weakTight).type).toBe("fold");
+    expect(showdownPlan.callThreshold).toBeLessThan(tightPlan.callThreshold);
+    expect(showdownPlan.topPairCallThreshold).toBeLessThan(tightPlan.topPairCallThreshold);
+    expect(chooseBotAction({ ...baseState, seats: [showdownControl] }, showdownControl).type).toBe("call");
+    expect(chooseBotAction({ ...baseState, seats: [tightDefense] }, tightDefense).type).toBe("call");
   });
 
   test("pressure regular barrels draws wider than TAG regular", () => {
@@ -392,7 +399,7 @@ describe("bot postflop profiles", () => {
     expect(pressurePlan.semiBluffBetThreshold).toBeLessThan(tagPlan.semiBluffBetThreshold);
   });
 
-  test("maniac pressure sizing is larger than TAG sizing", () => {
+  test("high-variance attacker pressure sizing is larger than TAG sizing", () => {
     const board = [card("A", "s"), card("8", "d"), card("3", "c")];
     const baseState = {
       street: "flop",

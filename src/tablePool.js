@@ -36,7 +36,7 @@ export function pickArchetypes(random = Math.random) {
     nonRegular.push({ ...picked, pool: "deviated" });
   }
 
-  const tableStrength = regularCount === 1 ? "soft" : regularCount === 2 ? "standard" : "tough";
+  const tableStrength = regularCount === 1 ? "strong" : regularCount === 2 ? "tough" : "elite";
   return shuffle([...regulars, ...nonRegular], random).map((archetype) => ({
     ...archetype,
     tableStrength

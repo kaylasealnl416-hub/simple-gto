@@ -40,11 +40,11 @@ export const REGULAR_ARCHETYPES = [
 export const ELITE_ARCHETYPES = REGULAR_ARCHETYPES;
 
 export const DEVIATED_ARCHETYPES = [
-  { key: "weak-tight", label: "紧弱" },
-  { key: "lag", label: "松凶" },
-  { key: "calling-station", label: "跟注站" },
-  { key: "maniac", label: "疯鱼" },
-  { key: "recreational", label: "普通娱乐玩家" }
+  { key: "weak-tight", label: "强 Regular · 紧防型" },
+  { key: "lag", label: "强 Regular · LAG 压迫型" },
+  { key: "calling-station", label: "强 Regular · 摊牌控制型" },
+  { key: "maniac", label: "强 Regular · 高波动攻击型" },
+  { key: "recreational", label: "强 Regular · 现场直觉型" }
 ];
 
 export const ARCHETYPE_BEHAVIOR = {
@@ -139,19 +139,19 @@ export const ARCHETYPE_BEHAVIOR = {
     delay: [850, 1700]
   },
   "weak-tight": {
-    openShift: 8,
-    callShift: 8,
-    aggression: 0.24,
-    bluff: 0.05,
-    threeBet: 0.06,
-    coldCall: 0.18,
-    steal: 0.42,
-    cbet: 0.34,
-    barrel: 0.16,
-    defendBlind: 0.26,
-    showdownCurious: 0.14,
-    sizing: [2.4, 2.9],
-    delay: [1100, 2100]
+    openShift: 5,
+    callShift: 3,
+    aggression: 0.46,
+    bluff: 0.13,
+    threeBet: 0.15,
+    coldCall: 0.34,
+    steal: 0.55,
+    cbet: 0.54,
+    barrel: 0.34,
+    defendBlind: 0.46,
+    showdownCurious: 0.26,
+    sizing: [2.5, 3.2],
+    delay: [950, 1850]
   },
   lag: {
     openShift: -8,
@@ -169,49 +169,49 @@ export const ARCHETYPE_BEHAVIOR = {
     delay: [800, 1600]
   },
   "calling-station": {
-    openShift: 6,
-    callShift: -10,
-    aggression: 0.2,
-    bluff: 0.04,
-    threeBet: 0.05,
-    coldCall: 0.78,
-    steal: 0.36,
-    cbet: 0.28,
-    barrel: 0.12,
-    defendBlind: 0.83,
-    showdownCurious: 0.72,
-    sizing: [2.3, 2.9],
-    delay: [1000, 2000]
+    openShift: 3,
+    callShift: -6,
+    aggression: 0.42,
+    bluff: 0.1,
+    threeBet: 0.14,
+    coldCall: 0.62,
+    steal: 0.48,
+    cbet: 0.46,
+    barrel: 0.3,
+    defendBlind: 0.74,
+    showdownCurious: 0.62,
+    sizing: [2.4, 3.1],
+    delay: [900, 1800]
   },
   maniac: {
-    openShift: -14,
-    callShift: -12,
-    aggression: 0.84,
-    bluff: 0.36,
-    threeBet: 0.34,
-    coldCall: 0.52,
-    steal: 0.9,
-    cbet: 0.82,
-    barrel: 0.64,
-    defendBlind: 0.8,
-    showdownCurious: 0.48,
-    sizing: [3, 4.2],
-    delay: [650, 1500]
+    openShift: -9,
+    callShift: -5,
+    aggression: 0.78,
+    bluff: 0.3,
+    threeBet: 0.3,
+    coldCall: 0.43,
+    steal: 0.86,
+    cbet: 0.78,
+    barrel: 0.6,
+    defendBlind: 0.72,
+    showdownCurious: 0.38,
+    sizing: [2.9, 4],
+    delay: [700, 1500]
   },
   recreational: {
     openShift: -1,
-    callShift: -4,
-    aggression: 0.38,
-    bluff: 0.12,
-    threeBet: 0.1,
-    coldCall: 0.58,
-    steal: 0.5,
-    cbet: 0.42,
-    barrel: 0.24,
-    defendBlind: 0.55,
-    showdownCurious: 0.42,
-    sizing: [2.3, 3.1],
-    delay: [900, 1900]
+    callShift: -2,
+    aggression: 0.5,
+    bluff: 0.15,
+    threeBet: 0.16,
+    coldCall: 0.52,
+    steal: 0.57,
+    cbet: 0.55,
+    barrel: 0.36,
+    defendBlind: 0.58,
+    showdownCurious: 0.36,
+    sizing: [2.4, 3.3],
+    delay: [850, 1750]
   }
 };
 
