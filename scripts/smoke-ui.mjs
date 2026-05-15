@@ -11,6 +11,12 @@ const host = "127.0.0.1";
 const baseUrl = `http://${host}:${port}`;
 const screenshotDir = process.env.SMOKE_SCREENSHOT_DIR || join(tmpdir(), "simple-gto-smoke");
 const playwrightFallback = "/Users/sunda/.hermes/node/lib/node_modules/playwright/index.mjs";
+const proxyEnvKeys = ["http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"];
+
+for (const key of proxyEnvKeys) {
+  delete process.env[key];
+}
+process.env.NO_PROXY = ["localhost", "127.0.0.1", "::1", process.env.NO_PROXY].filter(Boolean).join(",");
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -1565,8 +1565,13 @@ function renderSeat(seat) {
   const style = SEAT_LAYOUT[seat.seatIndex];
   const isHero = seat.seatIndex === HERO_SEAT_INDEX;
   const revealCards = state.session.revealedSeatIds?.includes(seat.id);
+  const opponentCardsRevealed = !isHero && revealCards;
   const faceDown = !isHero && !revealCards;
   const showOpponentCards = !isHero && (!seat.folded || revealCards);
+  const seatCardsClass = `seat-cards ${opponentCardsRevealed ? "revealed" : ""}`;
+  const seatCardsStyle = opponentCardsRevealed
+    ? `top: calc(${style.top} + 8px); left: calc(${style.left} + 12px);`
+    : `top: calc(${style.top} - 6px); left: calc(${style.left} + 10px);`;
   const actionClass = seatActionClass(seat);
   const statusText = seatStatusText(seat);
   const dealer =
@@ -1575,8 +1580,8 @@ function renderSeat(seat) {
       : "";
   return `
     ${dealer}
-    ${showOpponentCards ? `<div class="seat-cards" style="top: calc(${style.top} - 6px); left: calc(${style.left} + 10px);">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
-    <div class="seat ${isHero ? "hero" : ""} ${actionClass} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
+    ${showOpponentCards ? `<div class="${seatCardsClass}" style="${seatCardsStyle}">${renderPlayingCard(seat.cards[0], faceDown)}${renderPlayingCard(seat.cards[1], faceDown)}</div>` : ""}
+    <div class="seat ${isHero ? "hero" : ""} ${opponentCardsRevealed ? "cards-revealed" : ""} ${actionClass} ${seat.folded ? "folded" : ""} ${state.session.actorIndex === seat.seatIndex ? "to-act" : ""}"
       style="top:${style.top}; left:${style.left};">
       <div class="label">${isHero ? "固定座位" : seat.name}</div>
       <div class="position">${positionLabel(seat.position)}</div>

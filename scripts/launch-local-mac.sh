@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${PORT:-4173}"
-URL="http://127.0.0.1:${PORT}/#autostart"
+LOCAL_HEALTH_URL="http://127.0.0.1:${PORT}/"
+URL="http://localhost:${PORT}/#autostart"
 STDOUT="${ROOT}/.tmp-serve.log"
 STDERR="${ROOT}/.tmp-serve.err.log"
 
@@ -23,8 +24,13 @@ find_bun() {
   return 1
 }
 
+curl_local() {
+  env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+    curl --noproxy "*" -fsS --max-time 1 "$@"
+}
+
 app_ready() {
-  curl -fsS --max-time 1 "http://127.0.0.1:${PORT}/" 2>/dev/null | grep -q "简单GTO"
+  curl_local "$LOCAL_HEALTH_URL" 2>/dev/null | grep -q "简单GTO"
 }
 
 port_open() {
@@ -61,7 +67,7 @@ fi
   ready=false
   for _ in $(seq 1 20); do
     sleep 0.25
-    if curl -fsS --max-time 1 "http://127.0.0.1:${PORT}/" 2>/dev/null | grep -q "简单GTO"; then
+    if app_ready; then
       ready=true
       break
     fi

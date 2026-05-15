@@ -284,6 +284,12 @@ button:disabled {
   pointer-events: none;
 }
 
+.seat-cards.revealed {
+  z-index: 5;
+  gap: 4px;
+  opacity: 1;
+}
+
 .seat {
   position: absolute;
   z-index: 2;
@@ -295,6 +301,11 @@ button:disabled {
   border: 1px solid rgba(119, 151, 144, 0.22);
   color: var(--text);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.seat.cards-revealed {
+  min-height: 108px;
+  padding-top: 58px;
 }
 
 .seat.hero {
@@ -507,16 +518,37 @@ button:disabled {
   box-shadow: 0 7px 12px rgba(0, 0, 0, 0.18);
 }
 
+.seat-cards.revealed .playing-card {
+  width: 36px;
+  height: 50px;
+  border-radius: 8px;
+  box-shadow:
+    0 8px 14px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
 .seat-cards .playing-card .rank {
   top: 4px;
   left: 4px;
   font-size: 11px;
 }
 
+.seat-cards.revealed .playing-card .rank {
+  top: 5px;
+  left: 6px;
+  font-size: 14px;
+}
+
 .seat-cards .playing-card .suit {
   right: 4px;
   bottom: 3px;
   font-size: 10px;
+}
+
+.seat-cards.revealed .playing-card .suit {
+  right: 6px;
+  bottom: 5px;
+  font-size: 13px;
 }
 
 .board .playing-card {
@@ -1149,6 +1181,11 @@ button:disabled {
     width: 96px;
     min-height: 76px;
     padding: 8px;
+  }
+
+  .seat.cards-revealed {
+    min-height: 102px;
+    padding-top: 54px;
   }
 
   .seat .position {
